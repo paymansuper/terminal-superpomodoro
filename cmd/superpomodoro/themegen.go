@@ -41,6 +41,7 @@ type themeJSON struct {
 	Name            string    `json:"name"`
 	Custom          bool      `json:"custom"`
 	Builtin         bool      `json:"builtin"` // a built-in theme with this name exists
+	Hidden          bool      `json:"hidden,omitempty"`
 	Extends         string    `json:"extends,omitempty"`
 	Author          string    `json:"author,omitempty"`
 	Description     string    `json:"description,omitempty"`
@@ -56,6 +57,8 @@ type themeJSON struct {
 	ImageFit        string    `json:"imageFit,omitempty"`
 	ImageScale      float64   `json:"imageScale,omitempty"`
 	ImagePosition   string    `json:"imagePosition,omitempty"`
+	ImageShiftX     float64   `json:"imageShiftX,omitempty"`
+	ImageShiftY     float64   `json:"imageShiftY,omitempty"`
 }
 
 func toJSON(t Theme) themeJSON {
@@ -68,6 +71,7 @@ func toJSON(t Theme) themeJSON {
 		Text:  t.Text.hexStr(), Muted: t.Muted.hexStr(), Surface: t.Surface.hexStr(),
 		Scene: t.Scene, Image: expandHome(t.Image), ImageBrightness: t.ImageBrightness,
 		ImageFit: t.ImageFit, ImageScale: t.ImageScale, ImagePosition: t.ImagePosition,
+		ImageShiftX: t.ImageShiftX, ImageShiftY: t.ImageShiftY,
 	}
 }
 
@@ -98,6 +102,9 @@ func (j themeJSON) fileContent() (string, error) {
 	case "", "top", "center", "bottom":
 	default:
 		return "", errors.New("image position must be top, center or bottom")
+	}
+	if j.ImageShiftX < -1 || j.ImageShiftX > 1 || j.ImageShiftY < -1 || j.ImageShiftY > 1 {
+		return "", errors.New("image shift must be between -1 and 1")
 	}
 	if j.ImageScale < 0 || j.ImageScale > 1 {
 		return "", errors.New("image scale must be between 0 and 1")
@@ -140,6 +147,12 @@ func (j themeJSON) fileContent() (string, error) {
 		}
 		if j.ImagePosition != "" && j.ImagePosition != "center" {
 			fmt.Fprintf(&sb, "image_position = %q\n", j.ImagePosition)
+		}
+		if j.ImageShiftX != 0 {
+			fmt.Fprintf(&sb, "image_shift_x = %.2f\n", j.ImageShiftX)
+		}
+		if j.ImageShiftY != 0 {
+			fmt.Fprintf(&sb, "image_shift_y = %.2f\n", j.ImageShiftY)
 		}
 	}
 	return sb.String(), nil
@@ -216,7 +229,8 @@ func (g *themegen) handler() http.Handler {
 	}
 
 	api("/api/state", http.MethodGet, func(w http.ResponseWriter, r *http.Request) {
-		list, err := loadThemes()
+		list, err := loadAllThemes()
+		hidden := hiddenThemes()
 		out := struct {
 			Themes   []themeJSON `json:"themes"`
 			Images   []string    `json:"images"`
@@ -226,7 +240,9 @@ func (g *themegen) handler() http.Handler {
 			Platform string      `json:"platform"`
 		}{Images: listImages(), Dir: themeDir(), Default: loadConfig().Theme, Platform: runtime.GOOS}
 		for _, t := range list {
-			out.Themes = append(out.Themes, toJSON(t))
+			j := toJSON(t)
+			j.Hidden = hidden[t.Name]
+			out.Themes = append(out.Themes, j)
 		}
 		if err != nil {
 			out.Warning = err.Error()
@@ -260,23 +276,63 @@ func (g *themegen) handler() http.Handler {
 	})
 
 	api("/api/delete", http.MethodPost, func(w http.ResponseWriter, r *http.Request) {
+		var j struct {
+			Name string
+			All  bool // also remove the built-in behind a changed theme
+		}
+		json.NewDecoder(io.LimitReader(r.Body, 1<<12)).Decode(&j)
+		msg, err := removeTheme(j.Name, j.All)
+		if err != nil {
+			fail(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeJSON(w, map[string]string{"message": msg})
+	})
+
+	api("/api/restore", http.MethodPost, func(w http.ResponseWriter, r *http.Request) {
 		var j struct{ Name string }
 		json.NewDecoder(io.LimitReader(r.Body, 1<<12)).Decode(&j)
-		if !themeNameRe.MatchString(j.Name) {
-			fail(w, http.StatusBadRequest, "invalid name")
-			return
-		}
-		if err := os.Remove(filepath.Join(themeDir(), j.Name+".theme")); err != nil {
-			fail(w, http.StatusBadRequest, "no custom theme file with that name")
-			return
-		}
+		setThemeHidden(j.Name, false)
 		writeJSON(w, map[string]bool{"ok": true})
+	})
+
+	// deleting an uploaded image: only files inside the images folder
+	api("/api/deleteImage", http.MethodPost, func(w http.ResponseWriter, r *http.Request) {
+		var j struct {
+			Path  string
+			Force bool
+		}
+		json.NewDecoder(io.LimitReader(r.Body, 1<<12)).Decode(&j)
+		p := filepath.Clean(j.Path)
+		if filepath.Dir(p) != filepath.Clean(themeImagesDir()) {
+			fail(w, http.StatusBadRequest, "only uploaded images can be deleted here")
+			return
+		}
+		var users []string
+		list, _ := loadAllThemes()
+		for _, t := range list {
+			if t.Custom && t.Image != "" && filepath.Clean(expandHome(t.Image)) == p {
+				users = append(users, t.Name)
+			}
+		}
+		if len(users) > 0 && !j.Force {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+			json.NewEncoder(w).Encode(map[string]any{"error": "image in use", "usedBy": users})
+			return
+		}
+		if err := os.Remove(p); err != nil {
+			fail(w, http.StatusBadRequest, "could not delete the image")
+			return
+		}
+		writeJSON(w, map[string]any{"ok": true, "usedBy": users})
 	})
 
 	api("/api/default", http.MethodPost, func(w http.ResponseWriter, r *http.Request) {
 		var j struct{ Name string }
 		json.NewDecoder(io.LimitReader(r.Body, 1<<12)).Decode(&j)
-		list, _ := loadThemes()
+		list, _ := loadAllThemes()
+		setThemeHidden(j.Name, false) // a removed theme comes back when it becomes the default
 		if _, ok := findTheme(list, j.Name); !ok {
 			fail(w, http.StatusBadRequest, "unknown theme, save it first")
 			return
@@ -339,7 +395,7 @@ func (g *themegen) handler() http.Handler {
 		}
 		p := filepath.Clean(r.URL.Query().Get("p"))
 		allowed := strings.HasPrefix(p, themeImagesDir()+string(os.PathSeparator))
-		if list, _ := loadThemes(); !allowed {
+		if list, _ := loadAllThemes(); !allowed {
 			for _, t := range list {
 				if t.Image != "" && filepath.Clean(expandHome(t.Image)) == p {
 					allowed = true

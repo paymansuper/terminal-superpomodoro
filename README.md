@@ -21,7 +21,7 @@ It is a single Go binary with zero dependencies, plus a tiny native Swift helper
 
 - **Big, readable clock** with gradient digits, six digit fonts and five progress bar styles
 - **Seven built-in themes**, from Tokyo Night and Catppuccin to Matrix and a monochrome option, plus more to import
-- **To-do list** right in the timer, pick a task to focus on and see how many pomodoros it took
+- **To-do list** right in the timer, plan each focus session with one or more tasks and see how many pomodoros they took
 - **Three animated scenes** that mean something, like a retro sun that sets as the phase runs out
 - **Theme editor in your browser** with color pickers, palette generator, image drag and drop and a live preview
 - **Share themes** as a single `.spomotheme` file with colors and image included, import in the terminal or the browser
@@ -165,6 +165,9 @@ Opens a theme editor in your browser with a live preview of the timer.
 - Pick every color with a color picker or let **✨ Generate palette** suggest a harmonious one
 - Switch the preview between focus, short break and long break, and simulate your terminal's background color
 - Choose the animated scene, drop in a background image and tune its brightness
+- With **fill**, drag the picture in the preview (or use the sliders) to choose which part stays visible
+- Delete uploaded pictures with the **×** on their thumbnail
+- **Delete** removes your own themes, **Remove** takes a built-in theme out of the list and **Reset** drops your changes to a built-in, removed themes come back with **restore**
 - **Open themes folder** and **Open images folder** show the files in Finder or your file manager
 - **Save & use as default** makes it your startup theme right away
 - **Export** downloads the current theme, **Export all** every custom theme, **Import** (or dropping a file anywhere) brings themes in
@@ -199,9 +202,21 @@ image_brightness = 0.4
 image_fit = "cover"                 # auto, cover or contain
 image_scale = 0.8                   # size when contained
 image_position = "center"           # top, center or bottom
+image_shift_y = -0.4                # fill only, -1 shows the top, 1 the bottom
+image_shift_x = 0                   # fill only, -1 shows the left edge, 1 the right
 ```
 
 Save the file while the timer is running and the change shows up within a second, so you can tune colors live. A file named after a built-in theme, for example `matrix.theme`, modifies that theme. `spomo theme list` shows all themes and `spomo theme dir` prints the folder. There is an example in [`examples/fjord.theme`](examples/fjord.theme).
+
+### Removing themes
+
+```sh
+spomo theme rm fjord          # deletes your theme file
+spomo theme rm dracula        # takes a built-in theme out of the list
+spomo theme restore dracula   # brings it back, --all restores every built-in
+```
+
+Deleting a file that changed a built-in theme brings the original back. Add `--all` to remove the built-in as well. Removed built-in themes still work as a base for `extends`.
 
 ## Sharing themes
 
@@ -221,7 +236,7 @@ If a name is already taken the import adds a suffix like `fjord-2` instead of ov
 
 <div align="center"><img src="docs/image-background.svg" alt="SuperPomodoro with a sunset image as background" width="620"></div>
 
-Any PNG, JPG or GIF can sit behind the timer, darkened so the clock stays readable. Photos fill the whole window, logos and other pictures with transparency are shown whole, with their transparent parts left see through. Set `image_fit` to `cover` (fill and crop) or `contain` (whole picture) to choose yourself, and use `image_scale` and `image_position` (`top`, `center`, `bottom`) to size and place a contained picture.
+Any PNG, JPG or GIF can sit behind the timer, darkened so the clock stays readable. Photos fill the whole window, logos and other pictures with transparency are shown whole, with their transparent parts left see through. Set `image_fit` to `cover` (fill and crop) or `contain` (whole picture) to choose yourself, and use `image_scale` and `image_position` (`top`, `center`, `bottom`) to size and place a contained picture. A filled picture is cropped, `image_shift_y` and `image_shift_x` (from -1 to 1) move it so the part you want stays in view.
 
 - **Sharp, in full resolution** in Ghostty and Kitty (Kitty graphics protocol, the picture sits below the text) and in iTerm2 (as the session background image, removed again when you quit)
 - **Pixel style** everywhere else, drawn with half block characters, two pixels per cell, in any true color terminal. Text gets a calm, darker strip behind it.
@@ -247,6 +262,8 @@ Press `w` and the terminal minimizes itself while a small window keeps the timer
 | `space` or `return` | Start the next phase and return to the corner |
 | `esc` | Later, back to the corner without starting |
 | Open terminal | Bring the terminal back |
+
+**Your session's to-dos** are listed under the timer as a checklist, a click ticks a task off. The window grows with the list. When a phase ends the centered window shows the list again, so you can tick off what you finished before the break.
 
 **Back to the terminal** by clicking the small window and pressing `w` again, or by double clicking it. Once clicked it also understands `space` and `s`, just like the terminal.
 
@@ -303,6 +320,9 @@ image_fit = "auto"
 | `image_fit` | `auto` | `cover` fills the window, `contain` shows the whole picture, `auto` picks contain for pictures with transparency |
 | `image_scale` | `0.8` | Size of a contained picture, from 0 to 1 of the window |
 | `image_position` | `center` | `top`, `center` or `bottom` for a contained picture |
+| `image_shift_y` | `0` | Which part of a filled picture shows, from -1 (top) to 1 (bottom) |
+| `image_shift_x` | `0` | The same from left (-1) to right (1) |
+| `hidden_themes` | | Built-in themes you removed, comma separated, managed by `spomo theme rm` and `restore` |
 | `image_mode` | `auto` | `auto` picks sharp or pixel by terminal, `sharp` or `pixel` forces one |
 
 ### Command line flags
@@ -315,6 +335,7 @@ image_fit = "auto"
 
 spomo themegen                         theme editor in the browser
 spomo theme list | new <name> [--from <theme>] | dir
+spomo theme rm <name> [--all] | restore <name> | restore --all
 spomo todo [list | add <text> | done <n> | focus <n> | rm <n> | clear | path]
 spomo theme export <name>... | --all [-o file]
 spomo theme import <file> [--force]

@@ -44,8 +44,10 @@ type Theme struct {
 	ImageFit             string  // auto, cover, contain; empty means global setting
 	ImageScale           float64 // contain size 0..1
 	ImagePosition        string  // top, center, bottom
-	Custom               bool    // loaded from a theme file
-	Extends              string  // base theme named in the theme file
+	ImageShiftX          float64 // cover: -1..1, 0 = centered
+	ImageShiftY          float64
+	Custom               bool   // loaded from a theme file
+	Extends              string // base theme named in the theme file
 	Author, Description  string
 }
 

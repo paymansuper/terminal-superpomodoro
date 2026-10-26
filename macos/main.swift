@@ -34,6 +34,8 @@ struct TimerState: Decodable {
     var imageFit: String?      // "cover" or "contain", resolved by the terminal app
     var imageScale: Double?
     var imagePosition: String?
+    var imageShiftX: Double?   // fill mode: -1 ... 1, 0 is centered
+    var imageShiftY: Double?
     var tasks: [TaskItem]?     // to-dos planned for this focus session
 }
 
@@ -116,11 +118,20 @@ struct FloatView: View {
                             .padding(.vertical, pos == "center" ? 0 : g.size.height * 0.06)
                             .frame(width: g.size.width, height: g.size.height, alignment: align)
                     } else {
-                        Image(nsImage: img)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: g.size.width, height: g.size.height)
-                            .clipped()
+                        // fill the window, the shift picks which part stays visible (same math as the terminal)
+                        let W = g.size.width, H = g.size.height
+                        let iw = max(img.size.width, 1), ih = max(img.size.height, 1)
+                        let sc = max(W / iw, H / ih)
+                        let fx = 0.5 + min(max(model.state?.imageShiftX ?? 0, -1), 1) / 2
+                        let fy = 0.5 + min(max(model.state?.imageShiftY ?? 0, -1), 1) / 2
+                        ZStack(alignment: .topLeading) {
+                            Image(nsImage: img)
+                                .resizable()
+                                .frame(width: iw * sc, height: ih * sc)
+                                .offset(x: (W - iw * sc) * fx, y: (H - ih * sc) * fy)
+                        }
+                        .frame(width: W, height: H, alignment: .topLeading)
+                        .clipped()
                     }
                 }
                 // dim the picture so the timer stays readable

@@ -158,6 +158,18 @@
               ],
               "default": "center",
               "description": "Vertical position for contain."
+            },
+            "shiftX": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1,
+              "description": "Cover only: which part shows horizontally, -1 left, 0 center, 1 right."
+            },
+            "shiftY": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1,
+              "description": "Cover only: which part shows vertically, -1 top, 0 center, 1 bottom."
             }
           },
           "additionalProperties": false

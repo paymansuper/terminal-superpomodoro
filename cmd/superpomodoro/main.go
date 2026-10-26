@@ -49,6 +49,9 @@ type Config struct {
 	ImageFit          string // auto, cover or contain
 	ImageScale        float64
 	ImagePosition     string
+	ImageShiftX       float64
+	ImageShiftY       float64
+	HiddenThemes      string // built-in themes the user removed, comma separated
 	ImageBrightness   float64
 	StatsDate         string
 	StatsSessions     int
@@ -184,6 +187,12 @@ func loadConfig() Config {
 			c.ImageScale, _ = strconv.ParseFloat(v, 64)
 		case "image_position":
 			c.ImagePosition = v
+		case "image_shift_x":
+			c.ImageShiftX, _ = strconv.ParseFloat(v, 64)
+		case "image_shift_y":
+			c.ImageShiftY, _ = strconv.ParseFloat(v, 64)
+		case "hidden_themes":
+			c.HiddenThemes = v
 		case "image_brightness":
 			c.ImageBrightness, _ = strconv.ParseFloat(v, 64)
 		case "stats_date":
@@ -207,7 +216,8 @@ func saveConfig(c Config) {
 	fmt.Fprintf(&sb, "theme = %q\nfont = %q\nbar = %q\n", c.Theme, c.Font, c.Bar)
 	fmt.Fprintf(&sb, "auto = %t\nbell = %t\nnotify = %t\nzen = %t\nkeys = %t\nraise = %t\n", c.Auto, c.Bell, c.Notify, c.Zen, c.Keys, c.RaiseOnEnd)
 	fmt.Fprintf(&sb, "sound = %t\nsound_focus = %q\nsound_break = %q\nbg = %q\nterm_bg = %q\n", c.Sound, c.SoundFocus, c.SoundBreak, c.Bg, c.TermBg)
-	fmt.Fprintf(&sb, "image = %q\nimage_brightness = %g\nimage_mode = %q\nimage_fit = %q\nimage_scale = %g\nimage_position = %q\n", c.Image, c.ImageBrightness, c.ImageMode, c.ImageFit, c.ImageScale, c.ImagePosition)
+	fmt.Fprintf(&sb, "image = %q\nimage_brightness = %g\nimage_mode = %q\nimage_fit = %q\nimage_scale = %g\nimage_position = %q\nimage_shift_x = %g\nimage_shift_y = %g\n", c.Image, c.ImageBrightness, c.ImageMode, c.ImageFit, c.ImageScale, c.ImagePosition, c.ImageShiftX, c.ImageShiftY)
+	fmt.Fprintf(&sb, "hidden_themes = %q\n", c.HiddenThemes)
 	fmt.Fprintf(&sb, "stats_date = %q\nstats_sessions = %d\nstats_minutes = %d\n",
 		c.StatsDate, c.StatsSessions, c.StatsMinutes)
 	os.WriteFile(p, []byte(sb.String()), 0o644)
@@ -757,7 +767,7 @@ func usage() {
 
 Usage: superpomodoro [flags]
        superpomodoro themegen            open the theme editor in your browser
-       superpomodoro theme list|new|dir  manage theme files
+       superpomodoro theme list|new|rm|restore|dir  manage theme files
        superpomodoro todo [add|done|rm]  manage the to-do list
 
 Flags:

@@ -460,3 +460,37 @@ func TestFocusSession(t *testing.T) {
 		t.Fatal("open task should stay in the session, done one should leave")
 	}
 }
+
+func TestCoverShift(t *testing.T) {
+	// a tall picture in a wide window sticks out at top and bottom
+	_, _, top := placement(100, 300, 200, 100, "cover", imgOpts{ShiftY: -1})
+	_, _, mid := placement(100, 300, 200, 100, "cover", imgOpts{})
+	_, _, bot := placement(100, 300, 200, 100, "cover", imgOpts{ShiftY: 1})
+	if top != 0 || mid != -250 || bot != -500 {
+		t.Fatalf("offsets top %v mid %v bottom %v", top, mid, bot)
+	}
+}
+
+func TestRemoveAndRestoreTheme(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	if _, err := removeTheme("dracula", false); err != nil {
+		t.Fatal(err)
+	}
+	list, _ := loadThemes()
+	if _, ok := findTheme(list, "dracula"); ok {
+		t.Fatal("dracula still listed after removing it")
+	}
+	all, _ := loadAllThemes()
+	if _, ok := findTheme(all, "dracula"); !ok {
+		t.Fatal("hidden theme must stay available as a base")
+	}
+	setThemeHidden("dracula", false)
+	list, _ = loadThemes()
+	if _, ok := findTheme(list, "dracula"); !ok {
+		t.Fatal("restore did not bring dracula back")
+	}
+	if _, err := removeTheme("nope", false); err == nil {
+		t.Fatal("removing an unknown theme should fail")
+	}
+}

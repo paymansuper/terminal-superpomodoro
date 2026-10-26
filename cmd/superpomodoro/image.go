@@ -30,10 +30,12 @@ type imgOpts struct {
 	Fit    string  // auto, cover, contain
 	Scale  float64 // contain only, 0.1..1
 	Pos    string  // contain only: top, center, bottom
+	ShiftX float64 // cover only: -1 left .. 0 center .. 1 right
+	ShiftY float64 // cover only: -1 top .. 0 center .. 1 bottom
 }
 
 func (o imgOpts) key() string {
-	return fmt.Sprintf("%s|%s|%s|%.3f|%.3f", o.Path, o.Fit, o.Pos, o.Bright, o.Scale)
+	return fmt.Sprintf("%s|%s|%s|%.3f|%.3f|%.3f|%.3f", o.Path, o.Fit, o.Pos, o.Bright, o.Scale, o.ShiftX, o.ShiftY)
 }
 
 type imageLayer struct {
@@ -138,9 +140,14 @@ func placement(iw, ih, w, h float64, fit string, o imgOpts) (scale, offX, offY f
 		}
 		return
 	}
+	// cover: the overflow can be shifted to show another part of the picture
 	scale = max(w/iw, h/ih)
-	return scale, (w - iw*scale) / 2, (h - ih*scale) / 2
+	fx := 0.5 + clamp(o.ShiftX, -1, 1)/2
+	fy := 0.5 + clamp(o.ShiftY, -1, 1)/2
+	return scale, (w - iw*scale) * fx, (h - ih*scale) * fy
 }
+
+func clamp(v, lo, hi float64) float64 { return max(lo, min(hi, v)) }
 
 // sampleArea averages the source area behind one target pixel.
 // It returns the color and the coverage (0 = transparent).
@@ -263,7 +270,7 @@ func (a *App) imageOptions() imgOpts {
 	}
 	t := themes[a.theme]
 	o := imgOpts{Path: a.cfg.Image, Bright: a.cfg.ImageBrightness, Fit: a.cfg.ImageFit,
-		Scale: a.cfg.ImageScale, Pos: a.cfg.ImagePosition}
+		Scale: a.cfg.ImageScale, Pos: a.cfg.ImagePosition, ShiftX: a.cfg.ImageShiftX, ShiftY: a.cfg.ImageShiftY}
 	if t.Image != "" {
 		o.Path = t.Image
 	}
@@ -278,6 +285,9 @@ func (a *App) imageOptions() imgOpts {
 	}
 	if t.ImagePosition != "" {
 		o.Pos = t.ImagePosition
+	}
+	if t.ImageShiftX != 0 || t.ImageShiftY != 0 {
+		o.ShiftX, o.ShiftY = t.ImageShiftX, t.ImageShiftY
 	}
 	if a.imageFlag != "" {
 		o.Path = a.imageFlag

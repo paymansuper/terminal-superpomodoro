@@ -44,6 +44,8 @@ type miniState struct {
 	ImageFit  string     `json:"imageFit,omitempty"`
 	ImageSc   float64    `json:"imageScale,omitempty"`
 	ImagePos  string     `json:"imagePosition,omitempty"`
+	ShiftX    float64    `json:"imageShiftX,omitempty"`
+	ShiftY    float64    `json:"imageShiftY,omitempty"`
 	Tasks     []miniTask `json:"tasks,omitempty"`
 }
 
@@ -81,6 +83,7 @@ func (a *App) writeMiniState() {
 	}
 	if o := a.imageOptions(); o.Path != "" {
 		st.Image, st.ImageBr, st.ImageSc, st.ImagePos = expandHome(o.Path), o.Bright, o.Scale, o.Pos
+		st.ShiftX, st.ShiftY = o.ShiftX, o.ShiftY
 		st.ImageFit = "cover"
 		if a.img.load(o.Path) == nil {
 			st.ImageFit = a.img.resolvedFit(o)

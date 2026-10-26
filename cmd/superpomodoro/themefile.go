@@ -17,6 +17,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -167,6 +168,17 @@ func parseThemeFile(path string, known []Theme) (Theme, error) {
 				err = fmt.Errorf("image_position must be top, center or bottom")
 			}
 			t.ImagePosition = v
+		case "image_shift_x", "image_shift_y":
+			var f float64
+			f, err = strconv.ParseFloat(v, 64)
+			if err == nil && (f < -1 || f > 1) {
+				err = fmt.Errorf("%s must be between -1 and 1", k)
+			}
+			if k == "image_shift_x" {
+				t.ImageShiftX = f
+			} else {
+				t.ImageShiftY = f
+			}
 		default:
 			err = fmt.Errorf("unknown key %q", k)
 		}
@@ -177,9 +189,80 @@ func parseThemeFile(path string, known []Theme) (Theme, error) {
 	return t, nil
 }
 
-// loadThemes rebuilds the theme list from the built-ins plus every theme file.
-// Errors don't stop loading, the first one is returned for display.
+// loadThemes returns the themes the user can pick: everything from loadAllThemes
+// minus the ones they removed. Hidden themes still work as a base for extends.
 func loadThemes() ([]Theme, error) {
+	all, err := loadAllThemes()
+	hidden := hiddenThemes()
+	var list []Theme
+	for _, t := range all {
+		if !hidden[t.Name] {
+			list = append(list, t)
+		}
+	}
+	if len(list) == 0 { // never leave the app without a theme
+		return all, err
+	}
+	return list, err
+}
+
+// hiddenThemes reads the removed built-in themes from the config.
+func hiddenThemes() map[string]bool {
+	out := map[string]bool{}
+	for _, n := range strings.Split(loadConfig().HiddenThemes, ",") {
+		if n = strings.TrimSpace(n); n != "" {
+			out[n] = true
+		}
+	}
+	return out
+}
+
+// setThemeHidden removes a theme from the picker or brings it back.
+func setThemeHidden(name string, hide bool) {
+	h := hiddenThemes()
+	if hide {
+		h[name] = true
+	} else {
+		delete(h, name)
+	}
+	names := make([]string, 0, len(h))
+	for n := range h {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	c := loadConfig()
+	c.HiddenThemes = strings.Join(names, ",")
+	saveConfig(c)
+}
+
+// removeTheme deletes a custom theme file. A built-in theme (or a built-in that
+// is left after deleting the file that changed it) is hidden only when hideBuiltin is set.
+// It reports what happened in words.
+func removeTheme(name string, hideBuiltin bool) (string, error) {
+	if !themeNameRe.MatchString(name) {
+		return "", fmt.Errorf("invalid theme name %q", name)
+	}
+	path := filepath.Join(themeDir(), name+".theme")
+	_, isBuiltin := findTheme(builtinThemes, name)
+	if err := os.Remove(path); err == nil {
+		if isBuiltin && !hideBuiltin {
+			return "deleted your changes, the original " + name + " is back", nil
+		}
+		if !isBuiltin {
+			return "deleted " + name, nil
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	} else if !isBuiltin {
+		return "", fmt.Errorf("no theme named %q", name)
+	}
+	setThemeHidden(name, true)
+	return "removed " + name + ", bring it back with: superpomodoro theme restore " + name, nil
+}
+
+// loadAllThemes rebuilds the theme list from the built-ins plus every theme file.
+// Errors don't stop loading, the first one is returned for display.
+func loadAllThemes() ([]Theme, error) {
 	list := withScenes(builtinThemes)
 	files, _ := filepath.Glob(filepath.Join(themeDir(), "*.theme"))
 	sort.Strings(files)
@@ -209,6 +292,7 @@ func loadThemes() ([]Theme, error) {
 func themeFilesStamp() string {
 	files, _ := filepath.Glob(filepath.Join(themeDir(), "*.theme"))
 	var sb strings.Builder
+	sb.WriteString(loadConfig().HiddenThemes + ";")
 	for _, f := range files {
 		if st, err := os.Stat(f); err == nil {
 			fmt.Fprintf(&sb, "%s:%d:%d;", f, st.ModTime().UnixNano(), st.Size())
@@ -252,14 +336,50 @@ func themeCommand(args []string) int {
 	}
 	switch sub {
 	case "list", "":
-		for _, t := range list {
+		all, _ := loadAllThemes()
+		hidden := hiddenThemes()
+		for _, t := range all {
 			kind := "built-in"
 			if t.Custom {
 				kind = "custom"
 			}
+			if hidden[t.Name] {
+				kind = "removed"
+			}
 			fmt.Printf("%-14s %-9s scene %s\n", t.Name, kind, t.Scene)
 		}
 		fmt.Println("\ntheme files:", themeDir())
+	case "rm", "remove", "delete":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "usage: superpomodoro theme rm <name> [--all]")
+			return 2
+		}
+		// --all also removes the built-in when deleting a file that changed one
+		all := len(args) > 2 && args[2] == "--all"
+		msg, err := removeTheme(args[1], all)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Println(msg)
+	case "restore":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "usage: superpomodoro theme restore <name|--all>")
+			return 2
+		}
+		if args[1] == "--all" {
+			c := loadConfig()
+			c.HiddenThemes = ""
+			saveConfig(c)
+			fmt.Println("all built-in themes are back")
+			return 0
+		}
+		if !hiddenThemes()[args[1]] {
+			fmt.Fprintf(os.Stderr, "%s is not removed\n", args[1])
+			return 1
+		}
+		setThemeHidden(args[1], false)
+		fmt.Println("restored", args[1])
 	case "dir":
 		fmt.Println(themeDir())
 	case "gen", "edit", "editor":
@@ -319,7 +439,7 @@ scene   = %q
 		fmt.Println("created", path)
 		fmt.Printf("start it with: superpomodoro --theme %s\n", name)
 	default:
-		fmt.Fprintln(os.Stderr, "usage: superpomodoro theme [list|new|edit|export|import|dir]")
+		fmt.Fprintln(os.Stderr, "usage: superpomodoro theme [list|new|edit|rm|restore|export|import|dir]")
 		return 2
 	}
 	return 0

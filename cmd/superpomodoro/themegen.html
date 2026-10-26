@@ -96,6 +96,19 @@
   .gallery button { padding: 0; aspect-ratio: 16/10; overflow: hidden; border-radius: 7px; border: 2px solid transparent; background: #000; }
   .gallery button.on { border-color: var(--accent); }
   .gallery img { width: 100%; height: 100%; object-fit: contain; display: block; background: #0b0b10; }
+  .gallery .thumb { position: relative; }
+  .gallery .thumb button { width: 100%; }
+  .gallery .x {
+    position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; aspect-ratio: auto; padding: 0;
+    border-radius: 50%; border: 0; background: rgba(0,0,0,.7); color: #fff; font-size: 13px; line-height: 20px;
+    opacity: 0; transition: opacity .15s; cursor: pointer;
+  }
+  .gallery .thumb:hover .x, .gallery .x:focus { opacity: 1; }
+  .gallery .x:hover { background: #c0394f; }
+  .theme-item.hidden-theme { opacity: .5; }
+  .theme-item .restore { margin-left: auto; font-size: 11px; color: var(--accent); }
+  #preview.draggable { cursor: grab; }
+  #preview.dragging { cursor: grabbing; }
   #termBg { width: 26px; height: 24px; border: 0; padding: 0; background: none; cursor: pointer; }
   #termBg::-webkit-color-swatch-wrapper { padding: 0; }
   #termBg::-webkit-color-swatch { border-radius: 6px; border: 1px solid rgba(255,255,255,.2); }
@@ -136,6 +149,10 @@
     <div id="customList"></div>
     <div class="list-title">Built-in</div>
     <div id="builtinList"></div>
+    <div id="hiddenBox" style="display:none">
+      <div class="list-title">Removed</div>
+      <div id="hiddenList"></div>
+    </div>
   </aside>
 
   <section>
@@ -229,6 +246,16 @@
           <span class="note" style="display:block; margin: 10px 0 0">Size <b id="scaleVal"></b></span>
           <input type="range" id="imgScale" min="0.1" max="1" step="0.05" value="0.8">
         </div>
+        <div id="coverControls">
+          <div class="row" style="justify-content: space-between; margin-top: 10px">
+            <span class="note" style="margin:0">Show which part, or drag the preview</span>
+            <button id="shiftReset" class="ghost">Center</button>
+          </div>
+          <span class="note" style="display:block; margin: 8px 0 0">Up and down <b id="shiftYVal"></b></span>
+          <input type="range" id="shiftY" min="-1" max="1" step="0.01" value="0">
+          <span class="note" style="display:block; margin: 6px 0 0">Left and right <b id="shiftXVal"></b></span>
+          <input type="range" id="shiftX" min="-1" max="1" step="0.01" value="0">
+        </div>
       </div>
     </div>
 
@@ -258,7 +285,7 @@ async function api(path, body, isForm) {
   }
   const res = await fetch(path, opts);
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || res.statusText);
+  if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { data, status: res.status });
   return data;
 }
 const imgURL = (p) => `/img?t=${TOKEN}&p=${encodeURIComponent(p)}`;
@@ -321,8 +348,16 @@ function renderLists() {
       ${swatch(t)}<span>${t.name}</span>${t.name === state.default ? "<small>default</small>" : ""}</button>`;
   $("#customList").innerHTML = state.themes.filter((t) => t.custom).map(item).join("") ||
     `<div class="note" style="padding: 0 8px">No custom themes yet.</div>`;
-  $("#builtinList").innerHTML = state.themes.filter((t) => !t.custom).map(item).join("");
-  document.querySelectorAll(".theme-item").forEach((b) => b.onclick = () => select(state.themes.find((t) => t.name === b.dataset.name)));
+  $("#builtinList").innerHTML = state.themes.filter((t) => !t.custom && !t.hidden).map(item).join("");
+  const hidden = state.themes.filter((t) => t.hidden);
+  $("#hiddenBox").style.display = hidden.length ? "" : "none";
+  $("#hiddenList").innerHTML = hidden.map((t) => `<button class="theme-item hidden-theme" data-restore="${t.name}" title="Bring ${t.name} back">
+      ${swatch(t)}<span>${t.name}</span><span class="restore">restore</span></button>`).join("");
+  document.querySelectorAll("#customList .theme-item, #builtinList .theme-item").forEach((b) => b.onclick = () => select(state.themes.find((t) => t.name === b.dataset.name)));
+  document.querySelectorAll("[data-restore]").forEach((b) => b.onclick = async () => {
+    try { await api("/api/restore", { name: b.dataset.restore }); toast(`${b.dataset.restore} is back`); await load(b.dataset.restore); }
+    catch (e) { toast(e.message, true); }
+  });
 }
 
 function renderEditor() {
@@ -354,7 +389,7 @@ function renderEditor() {
   document.querySelectorAll("#posSeg button").forEach((b) => b.classList.toggle("on", b.dataset.v === (cur.imagePosition || "center")));
   $("#imgScale").value = cur.imageScale || 0.8;
   $("#scaleVal").textContent = Math.round((cur.imageScale || 0.8) * 100) + "%";
-  $("#containControls").style.display = resolvedFit() === "contain" ? "" : "none";
+  syncFitControls();
   renderGallery(); updateNotes();
 }
 
@@ -364,7 +399,10 @@ function updateNotes() {
   if (existing && existing.builtin && !existing.custom) note = "Saving under a built-in name modifies that theme for you.";
   else if (existing && existing.custom) note = "Saving overwrites your theme file.";
   $("#nameNote").textContent = note;
-  $("#delete").disabled = !(existing && existing.custom);
+  $("#delete").disabled = !existing || (existing.hidden && !existing.custom);
+  $("#delete").textContent = existing && existing.custom && existing.builtin ? "Reset" : existing && existing.custom ? "Delete" : "Remove";
+  $("#delete").title = existing && existing.custom && existing.builtin ? "Delete your changes and go back to the original built-in theme"
+    : existing && existing.custom ? "Delete this theme file" : "Take this built-in theme out of the list, you can restore it any time";
   $("#pathNote").textContent = `Theme folder ${state.dir}`;
 }
 
@@ -372,9 +410,39 @@ function renderGallery() {
   const g = $("#gallery");
   const imgs = [...(state.images || [])];
   if (cur && cur.image && !imgs.includes(cur.image)) imgs.unshift(cur.image);
-  g.innerHTML = imgs.map((p) => `<button class="${cur && cur.image === p ? "on" : ""}" data-p="${encodeURIComponent(p)}" title="${p.split("/").pop()}">
-      <img src="${imgURL(p)}" loading="lazy" alt=""></button>`).join("");
-  g.querySelectorAll("button").forEach((b) => b.onclick = () => { cur.image = decodeURIComponent(b.dataset.p); renderEditor(); loadPreviewImage(); });
+  const own = new Set(state.images || []);
+  g.innerHTML = imgs.map((p) => `<div class="thumb"><button class="${cur && cur.image === p ? "on" : ""}" data-p="${encodeURIComponent(p)}" title="${p.split("/").pop()}">
+      <img src="${imgURL(p)}" loading="lazy" alt=""></button>${own.has(p) ? `<button class="x" data-del="${encodeURIComponent(p)}" title="Delete this image" aria-label="Delete image">×</button>` : ""}</div>`).join("");
+  g.querySelectorAll("button[data-p]").forEach((b) => b.onclick = () => { cur.image = decodeURIComponent(b.dataset.p); renderEditor(); loadPreviewImage(); });
+  g.querySelectorAll("button[data-del]").forEach((b) => b.onclick = (e) => { e.stopPropagation(); deleteImage(decodeURIComponent(b.dataset.del)); });
+}
+
+async function deleteImage(p) {
+  const file = p.split("/").pop();
+  if (!confirm(`Delete ${file} from the images folder?`)) return;
+  let r;
+  try { r = await api("/api/deleteImage", { path: p }); }
+  catch (e) {
+    if (e.status !== 409) return toast(e.message, true);
+    const users = e.data.usedBy.join(", ");
+    if (!confirm(`${file} is used by ${users}. Delete it anyway? These themes will show no picture.`)) return;
+    try { r = await api("/api/deleteImage", { path: p, force: true }); } catch (e2) { return toast(e2.message, true); }
+  }
+  if (cur.image === p) { cur.image = ""; loadPreviewImage(); }
+  state.images = (state.images || []).filter((x) => x !== p);
+  renderEditor(); toast(`${file} deleted`);
+}
+
+function syncFitControls() {
+  const fit = resolvedFit();
+  $("#containControls").style.display = fit === "contain" ? "" : "none";
+  $("#coverControls").style.display = fit === "cover" ? "" : "none";
+  $("#shiftX").value = cur.imageShiftX || 0;
+  $("#shiftY").value = cur.imageShiftY || 0;
+  const pct = (v, a, b) => !v ? "centered" : `${Math.round(Math.abs(v) * 100)}% ${v < 0 ? a : b}`;
+  $("#shiftXVal").textContent = pct(cur.imageShiftX, "left", "right");
+  $("#shiftYVal").textContent = pct(cur.imageShiftY, "up", "down");
+  $("#preview").classList.toggle("draggable", !!(previewImg && fit === "cover"));
 }
 
 function changed() { /* preview redraws every frame */ }
@@ -442,6 +510,31 @@ $("#bright").oninput = (e) => { cur.imageBrightness = +e.target.value; $("#brigh
 document.querySelectorAll("#fitSeg button").forEach((b) => b.onclick = () => { cur.imageFit = b.dataset.v === "auto" ? "" : b.dataset.v; renderEditor(); });
 document.querySelectorAll("#posSeg button").forEach((b) => b.onclick = () => { cur.imagePosition = b.dataset.v === "center" ? "" : b.dataset.v; renderEditor(); });
 $("#imgScale").oninput = (e) => { cur.imageScale = +e.target.value; $("#scaleVal").textContent = Math.round(cur.imageScale * 100) + "%"; };
+const round2 = (v) => Math.round(Math.max(-1, Math.min(1, v)) * 100) / 100;
+$("#shiftX").oninput = (e) => { cur.imageShiftX = round2(+e.target.value); syncFitControls(); };
+$("#shiftY").oninput = (e) => { cur.imageShiftY = round2(+e.target.value); syncFitControls(); };
+$("#shiftReset").onclick = () => { cur.imageShiftX = 0; cur.imageShiftY = 0; syncFitControls(); };
+// drag the picture in the preview to choose the visible part (fill mode)
+let drag = null;
+$("#preview").addEventListener("pointerdown", (e) => {
+  if (!previewImg || resolvedFit() !== "cover") return;
+  drag = { x: e.clientX, y: e.clientY, sx: cur.imageShiftX || 0, sy: cur.imageShiftY || 0 };
+  $("#preview").setPointerCapture(e.pointerId); $("#preview").classList.add("dragging");
+});
+$("#preview").addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  const r = $("#preview").getBoundingClientRect();
+  const W = r.width, H = r.height, iw = previewImg.width, ih = previewImg.height;
+  const s = Math.max(W / iw, H / ih);
+  const overX = iw * s - W, overY = ih * s - H; // how far the picture sticks out
+  // dragging the picture right shows more of its left side, so the shift goes down
+  if (overX > 1) cur.imageShiftX = round2(drag.sx - 2 * (e.clientX - drag.x) / overX);
+  if (overY > 1) cur.imageShiftY = round2(drag.sy - 2 * (e.clientY - drag.y) / overY);
+  syncFitControls();
+});
+const endDrag = () => { drag = null; $("#preview").classList.remove("dragging"); };
+$("#preview").addEventListener("pointerup", endDrag);
+$("#preview").addEventListener("pointercancel", endDrag);
 let renderMode = "sharp";
 document.querySelectorAll("#renderSeg button").forEach((b) => b.onclick = () => {
   renderMode = b.dataset.v; document.querySelectorAll("#renderSeg button").forEach((x) => x.classList.toggle("on", x === b));
@@ -467,9 +560,19 @@ async function save(asDefault) {
 $("#save").onclick = () => save(false);
 $("#saveDefault").onclick = () => save(true);
 $("#delete").onclick = async () => {
-  if (!confirm(`Delete the theme file for ${cur.name}?`)) return;
-  try { await api("/api/delete", { name: cur.name }); toast(`${cur.name} deleted`); cur = null; await load(); }
-  catch (e) { toast(e.message, true); }
+  const t = state.themes.find((x) => x.name === cur.name);
+  if (!t) return;
+  const ask = t.custom && t.builtin ? `Delete your changes to ${t.name} and go back to the original?`
+    : t.custom ? `Delete the theme ${t.name}? Its file is removed.`
+    : `Remove ${t.name} from your themes? You can restore it any time.`;
+  if (!confirm(ask)) return;
+  try {
+    const r = await api("/api/delete", { name: cur.name });
+    toast(r.message || `${cur.name} removed`);
+    const keep = t.custom && t.builtin ? t.name : null;
+    cur = null;
+    await load(keep || (state.default !== t.name ? state.default : undefined));
+  } catch (e) { toast(e.message, true); }
 };
 $("#openThemes").onclick = () => api("/api/open", { what: "themes" }).catch((e) => toast(e.message, true));
 $("#openImages").onclick = () => api("/api/open", { what: "images" }).catch((e) => toast(e.message, true));
@@ -533,7 +636,7 @@ function loadPreviewImage() {
     const d = x.getImageData(0, 0, 48, 48).data;
     for (let i = 3; i < d.length; i += 4) if (d[i] < 240) { imgHasAlpha = true; break; }
     previewImg = im;
-    if (cur) $("#containControls").style.display = resolvedFit() === "contain" ? "" : "none";
+    if (cur) syncFitControls();
   };
   im.src = imgURL(cur.image);
 }
@@ -551,7 +654,8 @@ function placeImage(W, H) {
     return [(W - w) / 2, y, w, h];
   }
   const s = Math.max(W / iw, H / ih);
-  return [(W - iw * s) / 2, (H - ih * s) / 2, iw * s, ih * s];
+  const fx = 0.5 + (cur.imageShiftX || 0) / 2, fy = 0.5 + (cur.imageShiftY || 0) / 2;
+  return [(W - iw * s) * fx, (H - ih * s) * fy, iw * s, ih * s];
 }
 function imageLayer() {
   if (!previewImg) return null;

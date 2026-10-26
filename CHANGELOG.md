@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.2
+
+- Filled background pictures can be moved up, down, left and right to choose the visible part (`image_shift_y`, `image_shift_x`), by dragging the preview or with sliders in the theme editor, also in the mini window
+- Uploaded pictures can be deleted in the theme editor, with a warning when a theme still uses them
+- Themes can be removed: own themes are deleted, built-in themes are taken out of the list and can be restored, in the theme editor and with `spomo theme rm` and `spomo theme restore`
+
 ## v0.3.1
 
 - Focus sessions can hold several tasks: `return` in the list adds a task to the session or takes it out

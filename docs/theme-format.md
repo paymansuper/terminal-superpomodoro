@@ -64,6 +64,8 @@ The formal definition is the JSON Schema in [`theme-format.schema.json`](theme-f
 | `themes[].image.fit` | | `auto`, `cover` (fill and crop) or `contain` (whole picture), default `auto` |
 | `themes[].image.scale` | | Size for `contain`, 0 to 1 of the window |
 | `themes[].image.position` | | `top`, `center` or `bottom` for `contain` |
+| `themes[].image.shiftX` | | Number from -1 to 1, which part of a `cover` picture shows horizontally, 0 is centered |
+| `themes[].image.shiftY` | | Number from -1 to 1, the same vertically, -1 shows the top |
 | `themes[].image.data` | | The image file as base64, at most 20 MB |
 
 ## Import rules
