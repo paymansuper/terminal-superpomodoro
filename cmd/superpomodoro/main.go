@@ -46,6 +46,9 @@ type Config struct {
 	TermBg            string // optional override, e.g. "#1e1e2e"
 	Image             string
 	ImageMode         string // auto, sharp or pixel
+	ImageFit          string // auto, cover or contain
+	ImageScale        float64
+	ImagePosition     string
 	ImageBrightness   float64
 	StatsDate         string
 	StatsSessions     int
@@ -167,6 +170,12 @@ func loadConfig() Config {
 			c.Image = v
 		case "image_mode":
 			c.ImageMode = v
+		case "image_fit":
+			c.ImageFit = v
+		case "image_scale":
+			c.ImageScale, _ = strconv.ParseFloat(v, 64)
+		case "image_position":
+			c.ImagePosition = v
 		case "image_brightness":
 			c.ImageBrightness, _ = strconv.ParseFloat(v, 64)
 		case "stats_date":
@@ -190,7 +199,7 @@ func saveConfig(c Config) {
 	fmt.Fprintf(&sb, "theme = %q\nfont = %q\nbar = %q\n", c.Theme, c.Font, c.Bar)
 	fmt.Fprintf(&sb, "auto = %t\nbell = %t\nnotify = %t\nzen = %t\nkeys = %t\nraise = %t\n", c.Auto, c.Bell, c.Notify, c.Zen, c.Keys, c.RaiseOnEnd)
 	fmt.Fprintf(&sb, "sound = %t\nsound_focus = %q\nsound_break = %q\nbg = %q\nterm_bg = %q\n", c.Sound, c.SoundFocus, c.SoundBreak, c.Bg, c.TermBg)
-	fmt.Fprintf(&sb, "image = %q\nimage_brightness = %g\nimage_mode = %q\n", c.Image, c.ImageBrightness, c.ImageMode)
+	fmt.Fprintf(&sb, "image = %q\nimage_brightness = %g\nimage_mode = %q\nimage_fit = %q\nimage_scale = %g\nimage_position = %q\n", c.Image, c.ImageBrightness, c.ImageMode, c.ImageFit, c.ImageScale, c.ImagePosition)
 	fmt.Fprintf(&sb, "stats_date = %q\nstats_sessions = %d\nstats_minutes = %d\n",
 		c.StatsDate, c.StatsSessions, c.StatsMinutes)
 	os.WriteFile(p, []byte(sb.String()), 0o644)
@@ -589,15 +598,15 @@ func (a *App) compose(w, h int, lines []line, clockFrom, clockTo int, now time.T
 	}
 	lo := layout{clockTop: top + clockFrom, clockBottom: top + clockTo, horizon: top + clockTo + 2, progress: prog}
 	prefix := ""
-	if path, bright := a.imageSetting(); a.sharp.kind != sharpNone {
+	if o := a.imageOptions(); a.sharp.kind != sharpNone {
 		// real picture behind the text (Kitty, Ghostty, iTerm2)
-		prefix = a.sharp.update(&a.img, path, bright, w, h)
+		prefix = a.sharp.update(&a.img, o, w, h)
 		if a.sharp.errMsg != "" && a.imgErr != a.sharp.errMsg {
 			a.imgErr = a.sharp.errMsg
 			a.setFlash("background image: " + a.sharp.errMsg)
 		}
-	} else if path != "" {
-		if err := a.img.draw(cv, path, bright); err != nil && a.imgErr != err.Error() {
+	} else if o.Path != "" {
+		if err := a.img.draw(cv, o); err != nil && a.imgErr != err.Error() {
 			a.imgErr = err.Error()
 			a.setFlash("background image: " + err.Error())
 		}

@@ -58,7 +58,10 @@ type portableColors struct {
 type portableImage struct {
 	File       string  `json:"file"`
 	Brightness float64 `json:"brightness,omitempty"`
-	Data       string  `json:"data"` // base64 of the original file
+	Fit        string  `json:"fit,omitempty"`      // auto, cover, contain
+	Scale      float64 `json:"scale,omitempty"`    // contain size, 0..1
+	Position   string  `json:"position,omitempty"` // top, center, bottom
+	Data       string  `json:"data"`               // base64 of the original file
 }
 
 var unsafeNameChars = regexp.MustCompile(`[^a-z0-9-]+`)
@@ -92,6 +95,7 @@ func portableFromJSON(j themeJSON) (portableTheme, error) {
 			return p, fmt.Errorf("%s: image is larger than 20 MB", j.Name)
 		}
 		p.Image = &portableImage{File: filepath.Base(j.Image), Brightness: j.ImageBrightness,
+			Fit: j.ImageFit, Scale: j.ImageScale, Position: j.ImagePosition,
 			Data: base64.StdEncoding.EncodeToString(data)}
 	}
 	return p, nil
@@ -231,6 +235,7 @@ func importThemes(data []byte, filename string, overwrite bool) (importResult, e
 		}
 		if p.Image != nil {
 			j.ImageBrightness = p.Image.Brightness
+			j.ImageFit, j.ImageScale, j.ImagePosition = p.Image.Fit, p.Image.Scale, p.Image.Position
 			j.Image = "pending" // placeholder for validation
 		}
 		if _, err := j.fileContent(); err != nil {

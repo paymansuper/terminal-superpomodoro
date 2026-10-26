@@ -41,6 +41,9 @@ type Theme struct {
 	Scene                string  // animated scene for "auto": rain, waves, grid or off
 	Image                string  // optional background image for this theme
 	ImageBrightness      float64 // 0..1, 0 means use the global setting
+	ImageFit             string  // auto, cover, contain; empty means global setting
+	ImageScale           float64 // contain size 0..1
+	ImagePosition        string  // top, center, bottom
 	Custom               bool    // loaded from a theme file
 	Extends              string  // base theme named in the theme file
 	Author, Description  string

@@ -163,6 +163,9 @@ surface = "#3b4252"                 # subtle decoration
 scene   = "waves"                   # rain, waves, grid or off
 image   = "~/Pictures/fjord.jpg"    # optional background image
 image_brightness = 0.4
+image_fit = "cover"                 # auto, cover or contain
+image_scale = 0.8                   # size when contained
+image_position = "center"           # top, center or bottom
 ```
 
 Save the file while the timer is running and the change shows up within a second, so you can tune colors live. A file named after a built-in theme, for example `matrix.theme`, modifies that theme. `spomo theme list` shows all themes and `spomo theme dir` prints the folder. There is an example in [`examples/fjord.theme`](examples/fjord.theme).
@@ -185,7 +188,7 @@ If a name is already taken the import adds a suffix like `fjord-2` instead of ov
 
 <div align="center"><img src="docs/image-background.svg" alt="SuperPomodoro with a sunset image as background" width="620"></div>
 
-Any PNG, JPG or GIF can sit behind the timer. SuperPomodoro scales it to fill the window and darkens it so the clock stays readable.
+Any PNG, JPG or GIF can sit behind the timer, darkened so the clock stays readable. Photos fill the whole window, logos and other pictures with transparency are shown whole, with their transparent parts left see through. Set `image_fit` to `cover` (fill and crop) or `contain` (whole picture) to choose yourself, and use `image_scale` and `image_position` (`top`, `center`, `bottom`) to size and place a contained picture.
 
 - **Sharp, in full resolution** in Ghostty and Kitty (Kitty graphics protocol, the picture sits below the text) and in iTerm2 (as the session background image, removed again when you quit)
 - **Pixel style** everywhere else, drawn with half block characters, two pixels per cell, in any true color terminal. Text gets a calm, darker strip behind it.
@@ -244,6 +247,7 @@ term_bg = "#1e1e2e"
 image = "~/Pictures/sunset.jpg"
 image_brightness = 0.45
 image_mode = "auto"
+image_fit = "auto"
 ```
 
 | Key | Default | Description |
@@ -263,6 +267,9 @@ image_mode = "auto"
 | `term_bg` | | Your terminal background color, only needed if the terminal doesn't report it |
 | `image` | | Background image for all themes (png, jpg or gif) |
 | `image_brightness` | `0.45` | How bright the image is drawn, from 0 to 1 |
+| `image_fit` | `auto` | `cover` fills the window, `contain` shows the whole picture, `auto` picks contain for pictures with transparency |
+| `image_scale` | `0.8` | Size of a contained picture, from 0 to 1 of the window |
+| `image_position` | `center` | `top`, `center` or `bottom` for a contained picture |
 | `image_mode` | `auto` | `auto` picks sharp or pixel by terminal, `sharp` or `pixel` forces one |
 
 ### Command line flags

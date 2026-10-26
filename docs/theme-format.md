@@ -35,6 +35,7 @@ The formal definition is the JSON Schema in [`theme-format.schema.json`](theme-f
       "image": {
         "file": "fjord.jpg",
         "brightness": 0.4,
+        "fit": "cover",
         "data": "iVBORw0KGgoAAAANSUhEUgAA..."
       }
     }
@@ -60,6 +61,9 @@ The formal definition is the JSON Schema in [`theme-format.schema.json`](theme-f
 | `themes[].scene` | | `off`, `rain`, `waves` or `grid`, default `off` |
 | `themes[].image.file` | | Original file name, png, jpg or gif |
 | `themes[].image.brightness` | | 0 to 1, how bright the image is drawn |
+| `themes[].image.fit` | | `auto`, `cover` (fill and crop) or `contain` (whole picture), default `auto` |
+| `themes[].image.scale` | | Size for `contain`, 0 to 1 of the window |
+| `themes[].image.position` | | `top`, `center` or `bottom` for `contain` |
 | `themes[].image.data` | | The image file as base64, at most 20 MB |
 
 ## Import rules

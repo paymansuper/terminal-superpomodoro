@@ -53,6 +53,9 @@ type themeJSON struct {
 	Scene           string    `json:"scene"`
 	Image           string    `json:"image"`
 	ImageBrightness float64   `json:"imageBrightness"`
+	ImageFit        string    `json:"imageFit,omitempty"`
+	ImageScale      float64   `json:"imageScale,omitempty"`
+	ImagePosition   string    `json:"imagePosition,omitempty"`
 }
 
 func toJSON(t Theme) themeJSON {
@@ -64,6 +67,7 @@ func toJSON(t Theme) themeJSON {
 		Long:  [2]string{t.LongA.hexStr(), t.LongB.hexStr()},
 		Text:  t.Text.hexStr(), Muted: t.Muted.hexStr(), Surface: t.Surface.hexStr(),
 		Scene: t.Scene, Image: expandHome(t.Image), ImageBrightness: t.ImageBrightness,
+		ImageFit: t.ImageFit, ImageScale: t.ImageScale, ImagePosition: t.ImagePosition,
 	}
 }
 
@@ -84,6 +88,19 @@ func (j themeJSON) fileContent() (string, error) {
 	}
 	if j.ImageBrightness < 0 || j.ImageBrightness > 1 {
 		return "", errors.New("image brightness must be between 0 and 1")
+	}
+	switch j.ImageFit {
+	case "", "auto", "cover", "contain":
+	default:
+		return "", errors.New("image fit must be auto, cover or contain")
+	}
+	switch j.ImagePosition {
+	case "", "top", "center", "bottom":
+	default:
+		return "", errors.New("image position must be top, center or bottom")
+	}
+	if j.ImageScale < 0 || j.ImageScale > 1 {
+		return "", errors.New("image scale must be between 0 and 1")
 	}
 	for _, v := range []string{j.Image, j.Author, j.Description} {
 		if strings.ContainsAny(v, "\"\n\r") {
@@ -114,6 +131,15 @@ func (j themeJSON) fileContent() (string, error) {
 		fmt.Fprintf(&sb, "\nimage   = %q\n", j.Image)
 		if j.ImageBrightness > 0 {
 			fmt.Fprintf(&sb, "image_brightness = %g\n", j.ImageBrightness)
+		}
+		if j.ImageFit != "" && j.ImageFit != "auto" {
+			fmt.Fprintf(&sb, "image_fit = %q\n", j.ImageFit)
+		}
+		if j.ImageScale > 0 {
+			fmt.Fprintf(&sb, "image_scale = %g\n", j.ImageScale)
+		}
+		if j.ImagePosition != "" && j.ImagePosition != "center" {
+			fmt.Fprintf(&sb, "image_position = %q\n", j.ImagePosition)
 		}
 	}
 	return sb.String(), nil

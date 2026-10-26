@@ -31,6 +31,9 @@ struct TimerState: Decodable {
     var auto: Bool
     var image: String?
     var imageBrightness: Double?
+    var imageFit: String?      // "cover" or "contain", resolved by the terminal app
+    var imageScale: Double?
+    var imagePosition: String?
 }
 
 extension Color {
@@ -92,11 +95,24 @@ struct FloatView: View {
             Color(hex: model.state?.surface ?? "#16161e").opacity(0.96)
             if let img = model.image {
                 GeometryReader { g in
-                    Image(nsImage: img)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: g.size.width, height: g.size.height)
-                        .clipped()
+                    if model.state?.imageFit == "contain" {
+                        // logos: the whole picture, scaled and positioned like in the terminal
+                        let s = min(max(model.state?.imageScale ?? 0.8, 0.1), 1)
+                        let pos = model.state?.imagePosition ?? "center"
+                        let align: Alignment = pos == "top" ? .top : pos == "bottom" ? .bottom : .center
+                        Image(nsImage: img)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: g.size.width * s, height: g.size.height * s)
+                            .padding(.vertical, pos == "center" ? 0 : g.size.height * 0.06)
+                            .frame(width: g.size.width, height: g.size.height, alignment: align)
+                    } else {
+                        Image(nsImage: img)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: g.size.width, height: g.size.height)
+                            .clipped()
+                    }
                 }
                 // dim the picture so the timer stays readable
                 Color.black.opacity(1 - min(max(model.state?.imageBrightness ?? 0.45, 0), 1))

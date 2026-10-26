@@ -78,44 +78,34 @@ type sharpLayer struct {
 	errMsg string
 }
 
-// renderFile scales the picture to the window (cover), applies the brightness
-// and writes it as PNG into the cache, which the terminal then reads.
-func renderSharpFile(src image.Image, pw, ph int, bright float64, key string) (string, error) {
+// renderSharpFile places the picture in the window (cover or contain), applies
+// the brightness, keeps transparency and writes a PNG the terminal then reads.
+func renderSharpFile(l *imageLayer, o imgOpts, pw, ph int, key string) (string, error) {
 	const maxW = 2560
 	if pw > maxW {
 		ph = ph * maxW / pw
 		pw = maxW
 	}
+	src := l.src
 	b := src.Bounds()
-	iw, ih := float64(b.Dx()), float64(b.Dy())
-	scale := max(float64(pw)/iw, float64(ph)/ih)
-	offX, offY := (iw-float64(pw)/scale)/2, (ih-float64(ph)/scale)/2
-	out := image.NewRGBA(image.Rect(0, 0, pw, ph))
+	scale, offX, offY := placement(float64(b.Dx()), float64(b.Dy()), float64(pw), float64(ph), l.resolvedFit(o), o)
+	out := image.NewNRGBA(image.Rect(0, 0, pw, ph))
 	step := 1 / scale
-	samples := 1
-	if step > 1.5 {
-		samples = 2 // average a few source pixels when shrinking
-	}
 	for y := 0; y < ph; y++ {
 		for x := 0; x < pw; x++ {
-			var r, g, bl, n float64
-			for sy := 0; sy < samples; sy++ {
-				for sx := 0; sx < samples; sx++ {
-					fx := offX + (float64(x)+(float64(sx)+0.5)/float64(samples))*step
-					fy := offY + (float64(y)+(float64(sy)+0.5)/float64(samples))*step
-					c := src.At(b.Min.X+int(fx), b.Min.Y+int(fy))
-					cr, cg, cb, _ := c.RGBA()
-					r += float64(cr >> 8)
-					g += float64(cg >> 8)
-					bl += float64(cb >> 8)
-					n++
-				}
+			sx, sy := (float64(x)-offX)/scale, (float64(y)-offY)/scale
+			var c rgb
+			var cov float64
+			if step > 1.5 {
+				c, cov = sampleArea(src, sx, sy, step) // shrinking: average
+			} else {
+				c, cov = sampleBilinear(src, sx, sy) // enlarging: smooth
 			}
 			i := out.PixOffset(x, y)
-			out.Pix[i] = uint8(r / n * bright)
-			out.Pix[i+1] = uint8(g / n * bright)
-			out.Pix[i+2] = uint8(bl / n * bright)
-			out.Pix[i+3] = 255
+			out.Pix[i] = uint8(float64(c.r) * o.Bright)
+			out.Pix[i+1] = uint8(float64(c.g) * o.Bright)
+			out.Pix[i+2] = uint8(float64(c.b) * o.Bright)
+			out.Pix[i+3] = uint8(cov * 255)
 		}
 	}
 	dir := filepath.Join(miniDir(), "bg")
@@ -130,24 +120,20 @@ func renderSharpFile(src image.Image, pw, ph int, bright float64, key string) (s
 }
 
 // update returns the escape sequences needed to show (or remove) the picture.
-func (s *sharpLayer) update(img *imageLayer, path string, bright float64, cols, rows int) string {
-	if path == "" {
+func (s *sharpLayer) update(img *imageLayer, o imgOpts, cols, rows int) string {
+	if o.Path == "" {
 		return s.clear()
 	}
 	pw, ph := termPixels(cols, rows)
-	key := fmt.Sprintf("%s|%.3f|%dx%d|%dx%d", path, bright, cols, rows, pw, ph)
+	key := fmt.Sprintf("%s|%dx%d|%dx%d", o.key(), cols, rows, pw, ph)
 	if key == s.key && s.shown {
 		return ""
 	}
-	if path != img.path || img.src == nil {
-		img.path = path
-		img.src, img.err = decodeImage(path)
-	}
-	if img.err != nil {
-		s.errMsg = img.err.Error()
+	if err := img.load(o.Path); err != nil {
+		s.errMsg = err.Error()
 		return s.clear()
 	}
-	file, err := renderSharpFile(img.src, pw, ph, bright, key)
+	file, err := renderSharpFile(img, o, pw, ph, key)
 	if err != nil {
 		s.errMsg = err.Error()
 		return s.clear()

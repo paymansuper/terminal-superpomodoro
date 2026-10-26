@@ -119,13 +119,13 @@ func TestImageLayer(t *testing.T) {
 	f.Close()
 	var l imageLayer
 	cv := newCanvas(30, 10)
-	if err := l.draw(cv, path, 1); err != nil {
+	if err := l.draw(cv, imgOpts{Path: path, Bright: 1, Fit: "cover"}); err != nil {
 		t.Fatal(err)
 	}
 	if !cv.cells[0].hasBg || cv.cells[0].c.r > cv.cells[29].c.r || cv.cells[5].c.b < 150 {
 		t.Fatalf("unexpected pixels %+v %+v", cv.cells[0], cv.cells[29])
 	}
-	if err := l.draw(cv, "/nope.png", 1); err == nil {
+	if err := l.draw(cv, imgOpts{Path: "/nope.png", Bright: 1}); err == nil {
 		t.Fatal("expected error")
 	}
 }
@@ -294,24 +294,83 @@ func TestSharpImages(t *testing.T) {
 
 	s := sharpLayer{kind: sharpKitty}
 	var img imageLayer
-	out := s.update(&img, path, 0.5, 80, 24)
+	out := s.update(&img, imgOpts{Path: path, Bright: 0.5, Fit: "cover"}, 80, 24)
 	if !strings.Contains(out, "\x1b_Ga=T,f=100,t=f") || !strings.Contains(out, "z=-1073741825") {
 		t.Fatalf("kitty placement missing: %q", out)
 	}
-	if again := s.update(&img, path, 0.5, 80, 24); again != "" {
+	if again := s.update(&img, imgOpts{Path: path, Bright: 0.5, Fit: "cover"}, 80, 24); again != "" {
 		t.Fatal("re-sent unchanged image")
 	}
-	if resized := s.update(&img, path, 0.5, 100, 30); !strings.Contains(resized, "a=d") || !strings.Contains(resized, "a=T") {
+	if resized := s.update(&img, imgOpts{Path: path, Bright: 0.5, Fit: "cover"}, 100, 30); !strings.Contains(resized, "a=d") || !strings.Contains(resized, "a=T") {
 		t.Fatal("resize did not replace the image")
 	}
-	if off := s.update(&img, "", 0.5, 100, 30); !strings.Contains(off, "a=d,d=I") {
+	if off := s.update(&img, imgOpts{}, 100, 30); !strings.Contains(off, "a=d,d=I") {
 		t.Fatal("image not removed")
 	}
 	it := sharpLayer{kind: sharpITerm}
-	if out := it.update(&img, path, 0.5, 80, 24); !strings.Contains(out, "]1337;SetBackgroundImageFile=") {
+	if out := it.update(&img, imgOpts{Path: path, Bright: 0.5, Fit: "cover"}, 80, 24); !strings.Contains(out, "]1337;SetBackgroundImageFile=") {
 		t.Fatal("iTerm2 sequence missing")
 	}
 	if !strings.HasSuffix(it.clear(), "SetBackgroundImageFile=\x07") {
 		t.Fatal("iTerm2 reset missing")
+	}
+}
+
+func TestImageFitAndTransparency(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	// a wide logo: opaque red bar in the middle, transparent around it
+	path := filepath.Join(t.TempDir(), "logo.png")
+	img := image.NewNRGBA(image.Rect(0, 0, 100, 20))
+	for x := 10; x < 90; x++ {
+		for y := 5; y < 15; y++ {
+			img.Set(x, y, color.NRGBA{220, 40, 40, 255})
+		}
+	}
+	f, _ := os.Create(path)
+	png.Encode(f, img)
+	f.Close()
+
+	var l imageLayer
+	if l.load(path); !l.hasAlpha || l.resolvedFit(imgOpts{Fit: "auto"}) != "contain" {
+		t.Fatal("transparent logo should default to contain")
+	}
+	cv := newCanvas(40, 20)
+	if err := l.draw(cv, imgOpts{Path: path, Bright: 1, Fit: "auto", Scale: 1, Pos: "center"}); err != nil {
+		t.Fatal(err)
+	}
+	// corners stay transparent, the middle shows the red bar
+	if cv.cells[0].on || cv.cells[0].hasBg {
+		t.Fatal("transparent corner was painted")
+	}
+	mid := cv.cells[10*40+20]
+	if !mid.on || mid.c.r < 150 {
+		t.Fatalf("logo not visible in the middle: %+v", mid)
+	}
+	// the whole logo is visible: left and right parts of the bar are drawn
+	if !cv.cells[10*40+6].on || !cv.cells[10*40+33].on {
+		t.Fatal("contain cut the logo")
+	}
+	// cover would crop it
+	var c imageLayer
+	cv2 := newCanvas(40, 20)
+	c.draw(cv2, imgOpts{Path: path, Bright: 1, Fit: "cover"})
+	if !cv2.cells[10*40+0].on {
+		t.Fatal("cover should fill the width")
+	}
+	// sharp rendering keeps alpha
+	var s imageLayer
+	s.load(path)
+	file, err := renderSharpFile(&s, imgOpts{Path: path, Bright: 1, Fit: "contain", Scale: 1, Pos: "center"}, 200, 100, "k")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rf, _ := os.Open(file)
+	out, _ := png.Decode(rf)
+	rf.Close()
+	if _, _, _, a := out.At(1, 1).RGBA(); a != 0 {
+		t.Fatal("sharp image lost transparency")
+	}
+	if _, _, _, a := out.At(100, 50).RGBA(); a == 0 {
+		t.Fatal("sharp image lost the logo")
 	}
 }

@@ -95,7 +95,7 @@
   .gallery { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
   .gallery button { padding: 0; aspect-ratio: 16/10; overflow: hidden; border-radius: 7px; border: 2px solid transparent; background: #000; }
   .gallery button.on { border-color: var(--accent); }
-  .gallery img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .gallery img { width: 100%; height: 100%; object-fit: contain; display: block; background: #0b0b10; }
   #termBg { width: 26px; height: 24px; border: 0; padding: 0; background: none; cursor: pointer; }
   #termBg::-webkit-color-swatch-wrapper { padding: 0; }
   #termBg::-webkit-color-swatch { border-radius: 6px; border: 1px solid rgba(255,255,255,.2); }
@@ -146,6 +146,9 @@
         <button data-v="long">Long break</button>
       </div>
       <div class="spacer" style="flex:1"></div>
+      <div class="seg" id="renderSeg" title="How your terminal shows pictures">
+        <button data-v="sharp" class="on">sharp</button><button data-v="pixel">pixel</button>
+      </div>
       <label><input type="checkbox" id="showPanel" checked> shortcut panel</label>
       <label title="Simulate your terminal's background color">terminal
         <input type="color" id="termBg" value="#16161e"></label>
@@ -210,6 +213,22 @@
           <button id="noImage" class="ghost">No image</button>
         </div>
         <input type="range" id="bright" min="0.1" max="1" step="0.05" value="0.45">
+        <div class="row" style="justify-content: space-between; margin-top: 12px">
+          <span class="note" style="margin:0" title="auto shows logos and transparent pictures whole, photos fill the window">Fit</span>
+          <div class="seg" id="fitSeg">
+            <button data-v="auto">auto</button><button data-v="cover">fill</button><button data-v="contain">whole</button>
+          </div>
+        </div>
+        <div id="containControls">
+          <div class="row" style="justify-content: space-between; margin-top: 10px">
+            <span class="note" style="margin:0">Position</span>
+            <div class="seg" id="posSeg">
+              <button data-v="top">top</button><button data-v="center">center</button><button data-v="bottom">bottom</button>
+            </div>
+          </div>
+          <span class="note" style="display:block; margin: 10px 0 0">Size <b id="scaleVal"></b></span>
+          <input type="range" id="imgScale" min="0.1" max="1" step="0.05" value="0.8">
+        </div>
       </div>
     </div>
 
@@ -330,6 +349,12 @@ function renderEditor() {
   $("#bright").value = cur.imageBrightness;
   $("#brightVal").textContent = Math.round(cur.imageBrightness * 100) + "%";
   $("#imageControls").style.display = cur.image ? "" : "none";
+  const fit = cur.imageFit || "auto";
+  document.querySelectorAll("#fitSeg button").forEach((b) => b.classList.toggle("on", b.dataset.v === fit));
+  document.querySelectorAll("#posSeg button").forEach((b) => b.classList.toggle("on", b.dataset.v === (cur.imagePosition || "center")));
+  $("#imgScale").value = cur.imageScale || 0.8;
+  $("#scaleVal").textContent = Math.round((cur.imageScale || 0.8) * 100) + "%";
+  $("#containControls").style.display = resolvedFit() === "contain" ? "" : "none";
   renderGallery(); updateNotes();
 }
 
@@ -414,6 +439,13 @@ document.querySelectorAll("#phaseSeg button").forEach((b) => b.onclick = () => {
   phase = b.dataset.v; document.querySelectorAll("#phaseSeg button").forEach((x) => x.classList.toggle("on", x === b));
 });
 $("#bright").oninput = (e) => { cur.imageBrightness = +e.target.value; $("#brightVal").textContent = Math.round(cur.imageBrightness * 100) + "%"; };
+document.querySelectorAll("#fitSeg button").forEach((b) => b.onclick = () => { cur.imageFit = b.dataset.v === "auto" ? "" : b.dataset.v; renderEditor(); });
+document.querySelectorAll("#posSeg button").forEach((b) => b.onclick = () => { cur.imagePosition = b.dataset.v === "center" ? "" : b.dataset.v; renderEditor(); });
+$("#imgScale").oninput = (e) => { cur.imageScale = +e.target.value; $("#scaleVal").textContent = Math.round(cur.imageScale * 100) + "%"; };
+let renderMode = "sharp";
+document.querySelectorAll("#renderSeg button").forEach((b) => b.onclick = () => {
+  renderMode = b.dataset.v; document.querySelectorAll("#renderSeg button").forEach((x) => x.classList.toggle("on", x === b));
+});
 $("#noImage").onclick = () => { cur.image = ""; renderEditor(); loadPreviewImage(); };
 
 $("#newTheme").onclick = () => {
@@ -489,22 +521,55 @@ const GLYPHS = {
   "8": ["###", "#.#", "###", "#.#", "###"], "9": ["###", "#.#", "###", "..#", "###"],
   ":": [".", "#", ".", "#", "."],
 };
-let previewImg = null, pixelCanvas = null;
+let previewImg = null, imgHasAlpha = false;
 function loadPreviewImage() {
-  previewImg = null; pixelCanvas = null;
+  previewImg = null; imgHasAlpha = false;
   if (!cur || !cur.image) return;
   const im = new Image();
   im.onload = () => {
+    // same rule as the terminal app: pictures with transparency default to "whole"
+    const c = document.createElement("canvas"); c.width = 48; c.height = 48;
+    const x = c.getContext("2d"); x.drawImage(im, 0, 0, 48, 48);
+    const d = x.getImageData(0, 0, 48, 48).data;
+    for (let i = 3; i < d.length; i += 4) if (d[i] < 240) { imgHasAlpha = true; break; }
     previewImg = im;
-    // the terminal draws two pixels per cell, so downsample to COLS x ROWS*2
-    const pc = document.createElement("canvas"); pc.width = COLS; pc.height = ROWS * 2;
-    const c = pc.getContext("2d");
-    const s = Math.max(COLS / im.width, (ROWS * 2) / im.height);
-    const w = im.width * s, h = im.height * s;
-    c.drawImage(im, (COLS - w) / 2, (ROWS * 2 - h) / 2, w, h);
-    pixelCanvas = pc;
+    if (cur) $("#containControls").style.display = resolvedFit() === "contain" ? "" : "none";
   };
   im.src = imgURL(cur.image);
+}
+function resolvedFit() {
+  if (cur.imageFit === "cover" || cur.imageFit === "contain") return cur.imageFit;
+  return imgHasAlpha ? "contain" : "cover";
+}
+// mirrors placement() in image.go
+function placeImage(W, H) {
+  const iw = previewImg.width, ih = previewImg.height;
+  if (resolvedFit() === "contain") {
+    const s = Math.min(W / iw, H / ih) * (cur.imageScale || 0.8);
+    const w = iw * s, h = ih * s, pos = cur.imagePosition || "center";
+    const y = pos === "top" ? H * .06 : pos === "bottom" ? H - h - H * .06 : (H - h) / 2;
+    return [(W - w) / 2, y, w, h];
+  }
+  const s = Math.max(W / iw, H / ih);
+  return [(W - iw * s) / 2, (H - ih * s) / 2, iw * s, ih * s];
+}
+function imageLayer() {
+  if (!previewImg) return null;
+  const pixel = renderMode === "pixel";
+  const W = pixel ? COLS : COLS * CW, H = pixel ? ROWS * 2 : ROWS * CH;
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  const x = c.getContext("2d");
+  x.imageSmoothingQuality = "high";
+  x.drawImage(previewImg, ...placeImage(W, H));
+  if (pixel) { // the terminal only draws pixels that are mostly opaque
+    const id = x.getImageData(0, 0, W, H), d = id.data;
+    for (let i = 3; i < d.length; i += 4) d[i] = d[i] < 128 ? 0 : 255;
+    x.putImageData(id, 0, 0);
+  }
+  x.globalCompositeOperation = "source-atop"; // darken the picture, keep transparency
+  x.fillStyle = `rgba(0,0,0,${1 - cur.imageBrightness})`;
+  x.fillRect(0, 0, W, H);
+  return c;
 }
 
 const rain = Array.from({ length: COLS / 2 }, (_, i) => ({ x: i * 2, y: Math.random() * ROWS * 2 - ROWS, v: 7 + Math.random() * 14, n: 6 + Math.floor(Math.random() * 16) }));
@@ -521,7 +586,9 @@ function frame(now) {
   const t = (now - t0) / 1000;
   const termBg = $("#termBg").value;
   const [ca, cb] = colorsFor();
-  const base = pixelCanvas ? "#000000" : termBg;
+  const layer = imageLayer();
+  const pixelImg = layer && renderMode === "pixel";
+  const base = termBg;
   const dim = (c, f) => mix(base, c, f);
   const cell = (x, y, ch, color, bold) => {
     ctx.fillStyle = color;
@@ -531,17 +598,17 @@ function frame(now) {
   };
   const text = (x, y, s, color, bold) => { [...s].forEach((ch, i) => ch !== " " && cell(x + i, y, ch, color, bold)); };
   const strip = (x, y, w) => {
-    ctx.fillStyle = pixelCanvas ? "rgba(0,0,0,.72)" : termBg;
+    if (layer && !pixelImg) return; // sharp pictures show through the text, like in Ghostty
+    ctx.fillStyle = pixelImg ? "rgba(0,0,0,.72)" : termBg;
     ctx.fillRect((x - 2) * CW, y * CH, (w + 4) * CW, CH);
   };
 
   // background
   ctx.fillStyle = termBg; ctx.fillRect(0, 0, COLS * CW, ROWS * CH);
-  if (pixelCanvas) {
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(pixelCanvas, 0, 0, COLS * CW, ROWS * CH);
-    ctx.fillStyle = `rgba(0,0,0,${1 - cur.imageBrightness})`;
-    ctx.fillRect(0, 0, COLS * CW, ROWS * CH);
+  if (layer) {
+    ctx.imageSmoothingEnabled = !pixelImg;
+    ctx.drawImage(layer, 0, 0, COLS * CW, ROWS * CH);
+    ctx.imageSmoothingEnabled = true;
   }
 
   // layout like the terminal app
@@ -642,7 +709,7 @@ function frame(now) {
   // shortcut panel
   if ($("#showPanel").checked) {
     const pw = 74, px = Math.floor((COLS - pw) / 2), py = panelY;
-    const panel = mix(pixelCanvas ? "#0e0e12" : termBg, "#000000", .4);
+    const panel = mix(layer ? "#0e0e12" : termBg, "#000000", .4);
     ctx.fillStyle = panel; ctx.fillRect(px * CW, py * CH, pw * CW, 7 * CH);
     ctx.strokeStyle = mix(panel, cur.muted, .55); ctx.lineWidth = 1;
     ctx.strokeRect(px * CW + 4.5, py * CH + CH / 2, pw * CW - 9, 6 * CH);

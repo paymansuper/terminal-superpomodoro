@@ -152,6 +152,21 @@ func parseThemeFile(path string, known []Theme) (Theme, error) {
 			t.Image = v
 		case "image_brightness":
 			t.ImageBrightness, err = strconv.ParseFloat(v, 64)
+		case "image_fit":
+			if v != "auto" && v != "cover" && v != "contain" {
+				err = fmt.Errorf("image_fit must be auto, cover or contain")
+			}
+			t.ImageFit = v
+		case "image_scale":
+			t.ImageScale, err = strconv.ParseFloat(v, 64)
+			if err == nil && (t.ImageScale <= 0 || t.ImageScale > 1) {
+				err = fmt.Errorf("image_scale must be between 0 and 1")
+			}
+		case "image_position":
+			if v != "top" && v != "center" && v != "bottom" {
+				err = fmt.Errorf("image_position must be top, center or bottom")
+			}
+			t.ImagePosition = v
 		default:
 			err = fmt.Errorf("unknown key %q", k)
 		}

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.2
+
+- Background images can be shown whole (`image_fit = "contain"`) with size and position, logos and transparent pictures do that automatically
+- Transparent parts of pictures stay see through, in the terminal, the theme editor and the mini window
+- Smoother scaling for sharp pictures
+- Theme editor: fit, size and position controls and a sharp or pixel preview
+
 ## v0.2.1
 
 - Mini window: Ghostty, Kitty, WezTerm, Alacritty and Warp now get out of the way when you press `w` (hidden like ⌘H, since they can't minimize on request)
