@@ -494,3 +494,24 @@ func TestRemoveAndRestoreTheme(t *testing.T) {
 		t.Fatal("removing an unknown theme should fail")
 	}
 }
+
+func TestCleanMiniFiles(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	os.MkdirAll(miniDir(), 0o755)
+	dead := filepath.Join(miniDir(), "state-999999.json")
+	old := filepath.Join(miniDir(), "state.json")
+	for _, f := range []string{dead, old, statePath()} {
+		os.WriteFile(f, []byte("{}"), 0o644)
+	}
+	cleanMiniFiles()
+	if _, err := os.Stat(dead); err == nil {
+		t.Fatal("file of a finished timer was kept")
+	}
+	if _, err := os.Stat(old); err == nil {
+		t.Fatal("shared file of older versions was kept")
+	}
+	if _, err := os.Stat(statePath()); err != nil {
+		t.Fatal("own state file was removed")
+	}
+}

@@ -59,8 +59,30 @@ func miniDir() string {
 	return filepath.Join(dir, "superpomodoro")
 }
 
-func statePath() string { return filepath.Join(miniDir(), "state.json") }
-func cmdPath() string   { return filepath.Join(miniDir(), "cmd") }
+// Every timer process gets its own pair of files. With shared files a mini window
+// of one timer would follow another one and never close, leaving windows stacked.
+func statePath() string { return filepath.Join(miniDir(), fmt.Sprintf("state-%d.json", os.Getpid())) }
+func cmdPath() string   { return filepath.Join(miniDir(), fmt.Sprintf("cmd-%d", os.Getpid())) }
+
+// cleanMiniFiles removes files left behind by timers that are no longer running,
+// including the shared files of older versions.
+func cleanMiniFiles() {
+	os.Remove(filepath.Join(miniDir(), "state.json"))
+	os.Remove(filepath.Join(miniDir(), "cmd"))
+	files, _ := filepath.Glob(filepath.Join(miniDir(), "*-*"))
+	for _, f := range files {
+		base := strings.TrimSuffix(filepath.Base(f), ".json")
+		base = strings.TrimSuffix(base, ".tmp")
+		i := strings.LastIndex(base, "-")
+		pid, err := strconv.Atoi(base[i+1:])
+		if err != nil || !(strings.HasPrefix(base, "state-") || strings.HasPrefix(base, "cmd-")) {
+			continue
+		}
+		if pid != os.Getpid() && syscall.Kill(pid, 0) != nil {
+			os.Remove(f)
+		}
+	}
+}
 
 func (a *App) writeMiniState() {
 	t := themes[a.theme] // the window has its own dark surface, so use raw theme colors
@@ -131,6 +153,7 @@ func (a *App) toggleMini() {
 		return
 	}
 	a.mini = true
+	cleanMiniFiles()
 	os.Remove(cmdPath())
 	a.writeMiniState()
 	cmd := exec.Command(helper, "--state", statePath(), "--cmd", cmdPath())

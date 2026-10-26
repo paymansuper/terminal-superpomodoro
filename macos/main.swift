@@ -76,6 +76,40 @@ final class Model: ObservableObject {
 
 // MARK: - View
 
+/// Buttons of the big window. Drawn by hand so they stay readable on any theme,
+/// any picture behind the window and in light or dark mode.
+struct PillButtonStyle: ButtonStyle {
+    var fill: [Color]
+    var textColor: Color
+    var prominent: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .semibold, design: .rounded))
+            .foregroundColor(textColor)
+            .padding(.horizontal, 16)
+            .frame(height: 32)
+            .background(
+                Capsule().fill(LinearGradient(colors: fill, startPoint: .leading, endPoint: .trailing))
+                    .opacity(configuration.isPressed ? 0.75 : 1))
+            .overlay(Capsule().stroke(Color.white.opacity(prominent ? 0 : 0.22), lineWidth: 1))
+            .contentShape(Capsule())
+    }
+}
+
+/// Height of the window content, so the window always fits it exactly.
+struct ContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+/// Dark or light text, whichever reads better on the given color.
+func readableText(on hex: String) -> Color {
+    let c = NSColor(Color(hex: hex)).usingColorSpace(.sRGB) ?? .white
+    let lum = 0.2126 * c.redComponent + 0.7152 * c.greenComponent + 0.0722 * c.blueComponent
+    return lum > 0.55 ? Color(red: 0.07, green: 0.07, blue: 0.10) : .white
+}
+
 struct FloatView: View {
     @ObservedObject var model: Model
     let send: (String) -> Void
@@ -83,13 +117,21 @@ struct FloatView: View {
     let hide: () -> Void
     let dragChanged: () -> Void
     let dragEnded: () -> Void
+    let contentHeight: (CGFloat) -> Void
 
     var body: some View {
         ZStack {
             if let s = model.state {
-                if model.expanded { expanded(s) } else { compact(s) }
+                Group {
+                    if model.expanded { expanded(s) } else { compact(s) }
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .background(GeometryReader { g in
+                    Color.clear.preference(key: ContentHeightKey.self, value: g.size.height)
+                })
             }
         }
+        .onPreferenceChange(ContentHeightKey.self) { contentHeight($0) }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(background) // a background never changes the layout, even for big images
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -103,7 +145,7 @@ struct FloatView: View {
 
     private var background: some View {
         ZStack {
-            Color(hex: model.state?.surface ?? "#16161e").opacity(0.96)
+            Color(hex: model.state?.surface ?? "#16161e")
             if let img = model.image {
                 GeometryReader { g in
                     if model.state?.imageFit == "contain" {
@@ -138,6 +180,11 @@ struct FloatView: View {
                 Color.black.opacity(1 - min(max(model.state?.imageBrightness ?? 0.45, 0), 1))
             }
         }
+    }
+
+    private func secondaryStyle(_ s: TimerState) -> PillButtonStyle {
+        PillButtonStyle(fill: [Color.white.opacity(0.14), Color.white.opacity(0.10)],
+                        textColor: Color(hex: s.text), prominent: false)
     }
 
     private func gradient(_ s: TimerState) -> LinearGradient {
@@ -284,18 +331,20 @@ struct FloatView: View {
             HStack(spacing: 10) {
                 Button(s.running ? "Continue" : "Start \(next)") { send("start") }
                     .keyboardShortcut(.defaultAction)
-                    .buttonStyle(.borderedProminent)
-                    .tint(Color(hex: s.colorA))
+                    .buttonStyle(PillButtonStyle(fill: [Color(hex: s.colorA), Color(hex: s.colorB)],
+                                                 textColor: readableText(on: s.colorA), prominent: true))
                 Button("Later") { shrink() }
                     .keyboardShortcut(.cancelAction)
+                    .buttonStyle(secondaryStyle(s))
                 Button("Open terminal") { send("restore") }
+                    .buttonStyle(secondaryStyle(s))
                 // space starts as well, like in the terminal
                 Button("") { send("start") }
                     .keyboardShortcut(.space, modifiers: [])
                     .opacity(0)
                     .frame(width: 0, height: 0)
             }
-            .controlSize(.large)
+            .padding(.top, 4)
             Text("space or return to start · esc for later")
                 .font(.system(size: 11, design: .rounded))
                 .foregroundColor(Color(hex: s.muted).opacity(0.8))
@@ -331,13 +380,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let n = model.state?.tasks?.count ?? 0
         return n == 0 ? 0 : min(n, maxTasks) + (n > maxTasks ? 1 : 0)
     }
+    // measured content heights, the estimates are only used before the first layout
+    var measuredCompact: CGFloat = 0
+    var measuredExpanded: CGFloat = 0
     var compactSize: NSSize {
-        NSSize(width: 236, height: 88 + (taskRows > 0 ? CGFloat(taskRows) * 19 + 6 : 0))
+        let guess = 88 + (taskRows > 0 ? CGFloat(taskRows) * 19 + 6 : 0)
+        return NSSize(width: 236, height: measuredCompact > 0 ? measuredCompact : guess)
     }
     var expandedSize: NSSize {
-        NSSize(width: 500, height: 280 + (taskRows > 0 ? CGFloat(taskRows) * 21 + 26 : 0))
+        let guess = 300 + (taskRows > 0 ? CGFloat(taskRows) * 22 + 30 : 0)
+        return NSSize(width: 500, height: measuredExpanded > 0 ? measuredExpanded : guess)
     }
-    var lastTaskRows = 0
+
+    /// SwiftUI reports how tall the content is, the window follows.
+    fileprivate func contentHeightChanged(_ h: CGFloat) {
+        guard h > 20 else { return }
+        let height = ceil(h)
+        if model.expanded {
+            guard abs(height - measuredExpanded) > 1 else { return }
+            measuredExpanded = height
+            panel.setFrame(centerFrame(), display: true, animate: false)
+        } else {
+            guard abs(height - measuredCompact) > 1 else { return }
+            measuredCompact = height
+            guard panel.isVisible else { return }
+            // keep the top edge where it is
+            let old = panel.frame
+            let frame = NSRect(x: old.minX, y: old.maxY - height, width: compactSize.width, height: height)
+            panel.setFrame(frame, display: true, animate: false)
+            compactOrigin = frame.origin
+        }
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppDelegate.shared = self
@@ -354,6 +427,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.isOpaque = false
         panel.hasShadow = true
         panel.hidesOnDeactivate = false
+        panel.appearance = NSAppearance(named: .darkAqua) // readable controls in light mode too
 
         let view = FloatView(
             model: model,
@@ -361,8 +435,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             shrink: { [weak self] in self?.shrink() },
             hide: { [weak self] in self?.hideByUser() },
             dragChanged: { [weak self] in self?.dragChanged() },
-            dragEnded: { [weak self] in self?.dragEnded() })
-        panel.contentView = NSHostingView(rootView: view)
+            dragEnded: { [weak self] in self?.dragEnded() },
+            contentHeight: { [weak self] in self?.contentHeightChanged($0) })
+        // a solid dark backing in AppKit, so the window is never see through,
+        // whatever SwiftUI draws on top
+        let backing = NSView()
+        backing.wantsLayer = true
+        backing.layer?.backgroundColor = NSColor(srgbRed: 0.07, green: 0.07, blue: 0.10, alpha: 1).cgColor
+        backing.layer?.cornerRadius = 16
+        backing.layer?.masksToBounds = true
+        let hosting = NSHostingView(rootView: view)
+        if #available(macOS 13.0, *) { hosting.sizingOptions = [] } // the window size is ours
+        hosting.frame = backing.bounds
+        hosting.autoresizingMask = [.width, .height]
+        backing.addSubview(hosting)
+        panel.contentView = backing
         panel.setFrame(compactFrame(), display: true)
         panel.orderFrontRegardless()
 
@@ -403,16 +490,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         model.state = s
-        if taskRows != lastTaskRows {
-            // grow or shrink with the task list, keeping the top edge where it is
-            lastTaskRows = taskRows
-            let old = panel.frame
-            let size = model.expanded ? expandedSize : compactSize
-            var frame = NSRect(x: old.minX, y: old.maxY - size.height, width: size.width, height: size.height)
-            if model.expanded { frame = centerFrame() }
-            panel.setFrame(frame, display: true, animate: true)
-            if !model.expanded { compactOrigin = frame.origin }
-        }
         if s.image != model.imagePath {
             model.imagePath = s.image
             model.image = s.image.flatMap { NSImage(contentsOfFile: $0) }

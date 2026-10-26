@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.3
+
+- Mini window: the buttons of the big window that appears when a phase ends are readable again, on any theme and in light mode
+- The window has a solid dark backing and always fits its content, so nothing shows through or gets cut off
+- Several running timers no longer share one mini window file, which left old windows stacked behind the new one
+
 ## v0.3.2
 
 - Filled background pictures can be moved up, down, left and right to choose the visible part (`image_shift_y`, `image_shift_x`), by dragging the preview or with sliders in the theme editor, also in the mini window
