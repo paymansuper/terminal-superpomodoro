@@ -185,7 +185,12 @@ If a name is already taken the import adds a suffix like `fjord-2` instead of ov
 
 <div align="center"><img src="docs/image-background.svg" alt="SuperPomodoro with a sunset image as background" width="620"></div>
 
-Any PNG, JPG or GIF can sit behind the timer. SuperPomodoro scales it to fill the window, draws it with half block characters (two pixels per cell, in any true color terminal) and darkens it so the clock stays readable. Text gets a calm, darker strip behind it.
+Any PNG, JPG or GIF can sit behind the timer. SuperPomodoro scales it to fill the window and darkens it so the clock stays readable.
+
+- **Sharp, in full resolution** in Ghostty and Kitty (Kitty graphics protocol, the picture sits below the text) and in iTerm2 (as the session background image, removed again when you quit)
+- **Pixel style** everywhere else, drawn with half block characters, two pixels per cell, in any true color terminal. Text gets a calm, darker strip behind it.
+
+The right mode is picked automatically. Set `image_mode = "pixel"` if you like the retro look everywhere, or `"sharp"` to force the Kitty protocol in a terminal that isn't detected.
 
 ```sh
 spomo --image ~/Pictures/sunset.jpg     # just for this run
@@ -193,7 +198,7 @@ spomo --image ~/Pictures/sunset.jpg     # just for this run
 
 Set it permanently with `image` and `image_brightness` in the config, or per theme in a theme file. A theme's own image wins over the global one, and `--image` wins over both. Press `i` to switch it on and off. The mini window on macOS shows the same picture.
 
-The image is pixelated by design. The larger your terminal window and the smaller the font, the more detail you get.
+In pixel style, the larger your terminal window and the smaller the font, the more detail you get. Inside tmux or screen the pixel style is used, because they don't pass pictures through.
 
 ## Mini window (macOS)
 
@@ -238,6 +243,7 @@ zen = false
 term_bg = "#1e1e2e"
 image = "~/Pictures/sunset.jpg"
 image_brightness = 0.45
+image_mode = "auto"
 ```
 
 | Key | Default | Description |
@@ -257,6 +263,7 @@ image_brightness = 0.45
 | `term_bg` | | Your terminal background color, only needed if the terminal doesn't report it |
 | `image` | | Background image for all themes (png, jpg or gif) |
 | `image_brightness` | `0.45` | How bright the image is drawn, from 0 to 1 |
+| `image_mode` | `auto` | `auto` picks sharp or pixel by terminal, `sharp` or `pixel` forces one |
 
 ### Command line flags
 
@@ -278,12 +285,14 @@ Run `spomo --help` for the full list with all theme, font, bar and scene names.
 
 SuperPomodoro uses 24 bit color and works best in a terminal that supports it, which is almost every modern one.
 
-| Terminal | Timer | Auto minimize for the mini window |
-| --- | :---: | :---: |
-| Terminal.app | ✓ | ✓ |
-| iTerm2 | ✓ | ✓ |
-| WezTerm, Kitty | ✓ | depends on settings |
-| Ghostty, Alacritty, Warp | ✓ | minimize by hand |
+| Terminal | Timer | Sharp background images | Auto minimize for the mini window |
+| --- | :---: | :---: | :---: |
+| Ghostty | ✓ | ✓ | minimize by hand |
+| Kitty | ✓ | ✓ | depends on settings |
+| iTerm2 | ✓ | ✓ | ✓ |
+| Terminal.app | ✓ | pixel style | ✓ |
+| WezTerm | ✓ | pixel style | depends on settings |
+| Alacritty, Warp | ✓ | pixel style | minimize by hand |
 
 On start the app asks the terminal for its background color and lifts any text color that would be hard to read on it, while keeping the theme's hue. If your terminal doesn't answer, set `term_bg` in the config.
 

@@ -78,7 +78,10 @@ func (a *App) legend(screenW int) []line {
 	}
 	img, imgOn := "none", false
 	if p, _ := a.imageSetting(); p != "" {
-		img, imgOn = "on", true
+		img, imgOn = "pixel", true
+		if a.sharp.kind != sharpNone {
+			img = "sharp"
+		}
 	} else if a.imageOff {
 		img = "off"
 	}

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.2.0
+
+- Sharp, full resolution background images in Ghostty, Kitty and iTerm2, pixel style stays as fallback
+- New `image_mode` setting (`auto`, `sharp`, `pixel`)
+
 ## v0.1.0
 
 First public release.

@@ -45,6 +45,7 @@ type Config struct {
 	Bg                string
 	TermBg            string // optional override, e.g. "#1e1e2e"
 	Image             string
+	ImageMode         string // auto, sharp or pixel
 	ImageBrightness   float64
 	StatsDate         string
 	StatsSessions     int
@@ -52,6 +53,7 @@ type Config struct {
 }
 
 type App struct {
+	sharp         sharpLayer
 	floatPID      int
 	img           imageLayer
 	imgErr        string
@@ -163,6 +165,8 @@ func loadConfig() Config {
 			c.TermBg = v
 		case "image":
 			c.Image = v
+		case "image_mode":
+			c.ImageMode = v
 		case "image_brightness":
 			c.ImageBrightness, _ = strconv.ParseFloat(v, 64)
 		case "stats_date":
@@ -186,7 +190,7 @@ func saveConfig(c Config) {
 	fmt.Fprintf(&sb, "theme = %q\nfont = %q\nbar = %q\n", c.Theme, c.Font, c.Bar)
 	fmt.Fprintf(&sb, "auto = %t\nbell = %t\nnotify = %t\nzen = %t\nkeys = %t\nraise = %t\n", c.Auto, c.Bell, c.Notify, c.Zen, c.Keys, c.RaiseOnEnd)
 	fmt.Fprintf(&sb, "sound = %t\nsound_focus = %q\nsound_break = %q\nbg = %q\nterm_bg = %q\n", c.Sound, c.SoundFocus, c.SoundBreak, c.Bg, c.TermBg)
-	fmt.Fprintf(&sb, "image = %q\nimage_brightness = %g\n", c.Image, c.ImageBrightness)
+	fmt.Fprintf(&sb, "image = %q\nimage_brightness = %g\nimage_mode = %q\n", c.Image, c.ImageBrightness, c.ImageMode)
 	fmt.Fprintf(&sb, "stats_date = %q\nstats_sessions = %d\nstats_minutes = %d\n",
 		c.StatsDate, c.StatsSessions, c.StatsMinutes)
 	os.WriteFile(p, []byte(sb.String()), 0o644)
@@ -584,7 +588,15 @@ func (a *App) compose(w, h int, lines []line, clockFrom, clockTo int, now time.T
 		prog = math.Min(math.Max(1-float64(a.left())/float64(a.total), 0), 1)
 	}
 	lo := layout{clockTop: top + clockFrom, clockBottom: top + clockTo, horizon: top + clockTo + 2, progress: prog}
-	if path, bright := a.imageSetting(); path != "" {
+	prefix := ""
+	if path, bright := a.imageSetting(); a.sharp.kind != sharpNone {
+		// real picture behind the text (Kitty, Ghostty, iTerm2)
+		prefix = a.sharp.update(&a.img, path, bright, w, h)
+		if a.sharp.errMsg != "" && a.imgErr != a.sharp.errMsg {
+			a.imgErr = a.sharp.errMsg
+			a.setFlash("background image: " + a.sharp.errMsg)
+		}
+	} else if path != "" {
 		if err := a.img.draw(cv, path, bright); err != nil && a.imgErr != err.Error() {
 			a.imgErr = err.Error()
 			a.setFlash("background image: " + err.Error())
@@ -650,7 +662,7 @@ func (a *App) compose(w, h int, lines []line, clockFrom, clockTo int, now time.T
 		}
 	}
 	sb.WriteString(reset)
-	return sb.String()
+	return prefix + sb.String()
 }
 
 // overlay writes an ANSI-colored string onto the canvas; plain spaces stay transparent.
@@ -779,7 +791,7 @@ func main() {
 	cfg.Rounds = max(*rounds, 1)
 	cfg.Auto, cfg.Bell, cfg.Notify, cfg.Zen, cfg.Sound = *auto, *bell, !*noNotify, *zen, !*noSound
 
-	a := &App{cfg: cfg, round: 1, theme: themeIndex(*theme), font: fontIndex(*font), bar: barIndex(*bar), bgEff: effectIndex(*bgFlag), imageFlag: *imageFlag, themeStamp: themeFilesStamp(), start: time.Now()}
+	a := &App{cfg: cfg, round: 1, theme: themeIndex(*theme), font: fontIndex(*font), bar: barIndex(*bar), bgEff: effectIndex(*bgFlag), sharp: sharpLayer{kind: detectSharp(cfg.ImageMode)}, imageFlag: *imageFlag, themeStamp: themeFilesStamp(), start: time.Now()}
 	if themeErr != nil {
 		a.setFlash("theme file: " + themeErr.Error())
 	}
@@ -791,6 +803,7 @@ func main() {
 		os.Exit(1)
 	}
 	quit := func() {
+		a.sharp.cleanup()
 		restore()
 		if a.mini {
 			a.mini = false

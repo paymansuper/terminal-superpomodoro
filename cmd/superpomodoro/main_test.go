@@ -270,3 +270,48 @@ func TestThemeExchangeFormat(t *testing.T) {
 		}
 	}
 }
+
+func TestSharpImages(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	for env, want := range map[string]sharpKind{"ghostty": sharpKitty, "iTerm.app": sharpITerm, "Apple_Terminal": sharpNone} {
+		t.Setenv("TERM_PROGRAM", env)
+		t.Setenv("TERM", "xterm-256color")
+		t.Setenv("TMUX", "")
+		t.Setenv("KITTY_WINDOW_ID", "")
+		t.Setenv("GHOSTTY_RESOURCES_DIR", "")
+		if got := detectSharp("auto"); got != want {
+			t.Fatalf("%s: got %v want %v", env, got, want)
+		}
+	}
+	t.Setenv("TERM_PROGRAM", "ghostty")
+	if detectSharp("pixel") != sharpNone {
+		t.Fatal("image_mode pixel not respected")
+	}
+	path := filepath.Join(t.TempDir(), "p.png")
+	f, _ := os.Create(path)
+	png.Encode(f, image.NewRGBA(image.Rect(0, 0, 64, 32)))
+	f.Close()
+
+	s := sharpLayer{kind: sharpKitty}
+	var img imageLayer
+	out := s.update(&img, path, 0.5, 80, 24)
+	if !strings.Contains(out, "\x1b_Ga=T,f=100,t=f") || !strings.Contains(out, "z=-1073741825") {
+		t.Fatalf("kitty placement missing: %q", out)
+	}
+	if again := s.update(&img, path, 0.5, 80, 24); again != "" {
+		t.Fatal("re-sent unchanged image")
+	}
+	if resized := s.update(&img, path, 0.5, 100, 30); !strings.Contains(resized, "a=d") || !strings.Contains(resized, "a=T") {
+		t.Fatal("resize did not replace the image")
+	}
+	if off := s.update(&img, "", 0.5, 100, 30); !strings.Contains(off, "a=d,d=I") {
+		t.Fatal("image not removed")
+	}
+	it := sharpLayer{kind: sharpITerm}
+	if out := it.update(&img, path, 0.5, 80, 24); !strings.Contains(out, "]1337;SetBackgroundImageFile=") {
+		t.Fatal("iTerm2 sequence missing")
+	}
+	if !strings.HasSuffix(it.clear(), "SetBackgroundImageFile=\x07") {
+		t.Fatal("iTerm2 reset missing")
+	}
+}
