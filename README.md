@@ -287,12 +287,13 @@ SuperPomodoro uses 24 bit color and works best in a terminal that supports it, w
 
 | Terminal | Timer | Sharp background images | Auto minimize for the mini window |
 | --- | :---: | :---: | :---: |
-| Ghostty | ✓ | ✓ | minimize by hand |
-| Kitty | ✓ | ✓ | depends on settings |
+| Ghostty | ✓ | ✓ | ✓ hides the app |
+| Kitty | ✓ | ✓ | ✓ hides the app |
 | iTerm2 | ✓ | ✓ | ✓ |
 | Terminal.app | ✓ | pixel style | ✓ |
-| WezTerm | ✓ | pixel style | depends on settings |
-| Alacritty, Warp | ✓ | pixel style | minimize by hand |
+| WezTerm, Alacritty, Warp | ✓ | pixel style | ✓ hides the app |
+
+Terminals that can't minimize a single window are hidden like `⌘H` instead. The first time, macOS asks whether your terminal may control System Events, allow it once.
 
 On start the app asks the terminal for its background color and lifts any text color that would be hard to read on it, while keeping the theme's hue. If your terminal doesn't answer, set `term_bg` in the config.
 

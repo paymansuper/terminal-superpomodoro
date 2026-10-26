@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.2.1
+
+- Mini window: Ghostty, Kitty, WezTerm, Alacritty and Warp now get out of the way when you press `w` (hidden like ⌘H, since they can't minimize on request)
+
 ## v0.2.0
 
 - Sharp, full resolution background images in Ghostty, Kitty and iTerm2, pixel style stays as fallback

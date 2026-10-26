@@ -120,8 +120,8 @@ func (a *App) toggleMini() {
 		return
 	}
 	a.floatPID = cmd.Process.Pid
-	go cmd.Wait()                    // reap the helper when it exits, so floatAlive sees it gone
-	os.Stdout.WriteString("\x1b[2t") // ask the terminal to minimize itself
+	go cmd.Wait() // reap the helper when it exits, so floatAlive sees it gone
+	minimizeTerminal()
 }
 
 // pollMiniCommands handles clicks and keys coming from the floating window.
@@ -150,15 +150,53 @@ func (a *App) pollMiniCommands() {
 	a.writeMiniState()
 }
 
-// restoreTerminal un-minimizes the terminal window and brings its app to the front.
+// terminalApp identifies the terminal application we run in (macOS).
+type terminalApp struct {
+	name   string // for "tell application"
+	bundle string // for System Events
+	csiOK  bool   // understands the xterm minimize/restore sequences
+}
+
+func currentTerminal() (terminalApp, bool) {
+	switch os.Getenv("TERM_PROGRAM") {
+	case "Apple_Terminal":
+		return terminalApp{"Terminal", "com.apple.Terminal", true}, true
+	case "iTerm.app":
+		return terminalApp{"iTerm", "com.googlecode.iterm2", true}, true
+	case "ghostty":
+		return terminalApp{"Ghostty", "com.mitchellh.ghostty", false}, true
+	case "WezTerm":
+		return terminalApp{"WezTerm", "com.github.wez.wezterm", false}, true
+	case "WarpTerminal":
+		return terminalApp{"Warp", "dev.warp.Warp-Stable", false}, true
+	}
+	switch {
+	case os.Getenv("KITTY_WINDOW_ID") != "":
+		return terminalApp{"kitty", "net.kovidgoyal.kitty", false}, true
+	case os.Getenv("ALACRITTY_WINDOW_ID") != "" || os.Getenv("TERM") == "alacritty":
+		return terminalApp{"Alacritty", "org.alacritty", false}, true
+	}
+	return terminalApp{}, false
+}
+
+// minimizeTerminal gets the terminal out of the way for the mini window.
+// Terminal.app and iTerm2 minimize their own window on an xterm escape sequence.
+// Terminals that ignore it (Ghostty, Kitty, WezTerm, ...) get hidden like Cmd+H.
+func minimizeTerminal() {
+	os.Stdout.WriteString("\x1b[2t")
+	app, ok := currentTerminal()
+	if !ok || app.csiOK || runtime.GOOS != "darwin" {
+		return
+	}
+	spawn("osascript", "-e", fmt.Sprintf(
+		`tell application "System Events" to set visible of (first application process whose bundle identifier is %q) to false`, app.bundle))
+}
+
+// restoreTerminal un-minimizes (or unhides) the terminal and brings it to the front.
 func restoreTerminal() {
 	os.Stdout.WriteString("\x1b[1t\x1b[5t")
-	apps := map[string]string{
-		"Apple_Terminal": "Terminal", "iTerm.app": "iTerm", "ghostty": "Ghostty",
-		"WezTerm": "WezTerm", "vscode": "Visual Studio Code", "WarpTerminal": "Warp",
-	}
-	if app, ok := apps[os.Getenv("TERM_PROGRAM")]; ok && runtime.GOOS == "darwin" {
-		spawn("osascript", "-e", fmt.Sprintf(`tell application %q to activate`, app))
+	if app, ok := currentTerminal(); ok && runtime.GOOS == "darwin" {
+		spawn("osascript", "-e", fmt.Sprintf(`tell application %q to activate`, app.name))
 	}
 }
 
