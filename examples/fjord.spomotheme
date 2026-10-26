@@ -1,0 +1,30 @@
+{
+  "format": "superpomodoro-theme",
+  "version": 1,
+  "generator": "superpomodoro dev",
+  "exported": "2026-10-26T11:19:09Z",
+  "themes": [
+    {
+      "name": "fjord",
+      "extends": "nord",
+      "colors": {
+        "focus": [
+          "#5e81ac",
+          "#88c0d0"
+        ],
+        "break": [
+          "#a3be8c",
+          "#ebcb8b"
+        ],
+        "long": [
+          "#b48ead",
+          "#88c0d0"
+        ],
+        "text": "#eceff4",
+        "muted": "#4c566a",
+        "surface": "#3b4252"
+      },
+      "scene": "waves"
+    }
+  ]
+}

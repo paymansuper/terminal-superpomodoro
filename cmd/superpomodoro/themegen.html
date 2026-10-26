@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SuperPomodoro Theme Editor</title>
+<style>
+  :root {
+    --bg: #0f1015; --panel: #171821; --panel2: #1e2030; --line: #2a2c3d;
+    --text: #e6e7ef; --muted: #8b8fa7; --accent: #f7768e; --accent2: #bb9af7;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+    display: grid; grid-template-rows: auto 1fr; overflow: hidden;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px; padding: 12px 20px;
+    border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  header h1 { font-size: 15px; margin: 0; font-weight: 650; letter-spacing: .2px; }
+  header h1 span { color: var(--muted); font-weight: 500; }
+  header .spacer { flex: 1; }
+  main { display: grid; grid-template-columns: 220px 1fr 360px; min-height: 0; }
+  aside, section, .editor { min-height: 0; overflow: auto; }
+  aside { border-right: 1px solid var(--line); padding: 14px 10px; background: var(--panel); }
+  .editor { border-left: 1px solid var(--line); padding: 16px 18px 28px; background: var(--panel); }
+  section { padding: 18px 22px; display: flex; flex-direction: column; gap: 12px; }
+
+  button, .btn {
+    font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line);
+    border-radius: 8px; padding: 7px 12px; cursor: pointer; transition: background .15s, border-color .15s;
+  }
+  button:hover { border-color: #3b3e55; background: #24273a; }
+  button.primary { background: var(--accent); border-color: transparent; color: #14151c; font-weight: 650; }
+  button.primary:hover { filter: brightness(1.08); }
+  button.ghost { background: transparent; }
+  button.danger { color: #ff8a8a; }
+  button:disabled { opacity: .45; cursor: default; }
+
+  .list-title { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .8px; margin: 14px 8px 6px; }
+  .theme-item {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    background: transparent; border: 1px solid transparent; padding: 7px 8px; border-radius: 8px;
+  }
+  .theme-item.active { background: var(--panel2); border-color: var(--line); }
+  .swatch { display: flex; border-radius: 5px; overflow: hidden; flex: none; }
+  .swatch i { width: 9px; height: 18px; display: block; }
+  .theme-item small { margin-left: auto; color: var(--muted); font-size: 11px; }
+
+  .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .seg { display: inline-flex; background: var(--panel2); border: 1px solid var(--line); border-radius: 9px; padding: 3px; }
+  .seg button { border: 0; background: transparent; padding: 5px 11px; border-radius: 6px; color: var(--muted); }
+  .seg button.on { background: #2c2f45; color: var(--text); }
+  .toolbar label { color: var(--muted); display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .preview-wrap {
+    background: #000; border-radius: var(--radius); border: 1px solid var(--line);
+    overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.45); align-self: center; max-width: 100%;
+  }
+  .preview-bar { height: 30px; display: flex; align-items: center; gap: 7px; padding: 0 12px; background: #1b1c26; }
+  .preview-bar i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+  .preview-bar span { margin: 0 auto; color: var(--muted); font-size: 12px; transform: translateX(-20px); }
+  canvas { display: block; max-width: 100%; height: auto; }
+  .hint { color: var(--muted); font-size: 12.5px; text-align: center; }
+
+  .field { margin-bottom: 16px; }
+  .field > label, .group-title { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 7px; }
+  input[type=text], select {
+    width: 100%; font: inherit; color: var(--text); background: var(--panel2);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; outline: none;
+  }
+  input[type=text]:focus, select:focus { border-color: #4a4e6d; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .colors { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .color {
+    display: flex; align-items: center; gap: 8px; background: var(--panel2);
+    border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px;
+  }
+  .color input[type=color] { width: 26px; height: 26px; border: 0; padding: 0; background: none; cursor: pointer; flex: none; }
+  .color input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+  .color input[type=color]::-webkit-color-swatch { border-radius: 6px; border: 1px solid rgba(255,255,255,.15); }
+  .color input[type=text] { border: 0; background: transparent; padding: 2px 0; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; }
+  .color span { color: var(--muted); font-size: 11px; width: 44px; flex: none; white-space: nowrap; }
+  .color input[type=text] { min-width: 0; flex: 1; }
+  .pair { grid-column: span 2; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .drop {
+    border: 1.5px dashed #3a3d55; border-radius: 10px; padding: 16px; text-align: center;
+    color: var(--muted); cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .drop.over { border-color: var(--accent); background: rgba(247,118,142,.06); color: var(--text); }
+  .gallery { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
+  .gallery button { padding: 0; aspect-ratio: 16/10; overflow: hidden; border-radius: 7px; border: 2px solid transparent; background: #000; }
+  .gallery button.on { border-color: var(--accent); }
+  .gallery img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  #termBg { width: 26px; height: 24px; border: 0; padding: 0; background: none; cursor: pointer; }
+  #termBg::-webkit-color-swatch-wrapper { padding: 0; }
+  #termBg::-webkit-color-swatch { border-radius: 6px; border: 1px solid rgba(255,255,255,.2); }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px -18px 0; padding: 12px 18px; position: sticky; bottom: -28px; background: var(--panel); border-top: 1px solid var(--line); }
+  .note { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .badge { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 1px 8px; }
+
+  #toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: #262839; border: 1px solid var(--line); color: var(--text); padding: 10px 16px;
+    border-radius: 10px; opacity: 0; pointer-events: none; transition: all .25s; box-shadow: 0 10px 30px rgba(0,0,0,.4);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%); }
+  #toast.err { border-color: #7a3343; color: #ffb3c0; }
+  .stopped { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); font-size: 16px; color: var(--muted); }
+  @media (max-width: 1100px) { main { grid-template-columns: 180px 1fr 320px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>🍅 SuperPomodoro <span>Theme Editor</span></h1>
+  <div class="spacer"></div>
+  <button id="importBtn" title="Import a .spomotheme or .theme file">Import</button>
+  <button id="exportAll" title="Export all your custom themes into one .spomotheme file">Export all</button>
+  <input type="file" id="importFile" accept=".spomotheme,.json,.theme,application/json" hidden>
+  <button id="openThemes" title="Show the theme folder in your file manager">Open themes folder</button>
+  <button id="openImages" title="Show the image folder in your file manager">Open images folder</button>
+  <button id="quit" class="ghost">Quit</button>
+</header>
+
+<main>
+  <aside>
+    <div class="row" style="padding: 0 4px">
+      <button id="newTheme" class="primary" style="flex:1">+ New theme</button>
+    </div>
+    <div class="list-title">Custom</div>
+    <div id="customList"></div>
+    <div class="list-title">Built-in</div>
+    <div id="builtinList"></div>
+  </aside>
+
+  <section>
+    <div class="toolbar">
+      <div class="seg" id="phaseSeg">
+        <button data-v="focus" class="on">Focus</button>
+        <button data-v="break">Short break</button>
+        <button data-v="long">Long break</button>
+      </div>
+      <div class="spacer" style="flex:1"></div>
+      <label><input type="checkbox" id="showPanel" checked> shortcut panel</label>
+      <label title="Simulate your terminal's background color">terminal
+        <input type="color" id="termBg" value="#16161e"></label>
+    </div>
+    <div class="preview-wrap">
+      <div class="preview-bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><span>spomo</span></div>
+      <canvas id="preview"></canvas>
+    </div>
+    <div class="hint">Saved themes show up in a running SuperPomodoro within a second. Drop a .spomotheme file anywhere to import it.</div>
+  </section>
+
+  <div class="editor">
+    <div class="field">
+      <label for="name">Name</label>
+      <input type="text" id="name" placeholder="my-theme" autocomplete="off" spellcheck="false">
+      <div class="note" id="nameNote"></div>
+    </div>
+
+    <div class="field">
+      <label for="description">Description <span style="text-transform:none;letter-spacing:0">(optional)</span></label>
+      <input type="text" id="description" placeholder="Calm blues for long deep work sessions" maxlength="200" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="author">Author <span style="text-transform:none;letter-spacing:0">(optional)</span></label>
+      <input type="text" id="author" placeholder="Your name" maxlength="80" autocomplete="off">
+    </div>
+
+    <div class="field">
+      <label for="extends">Based on</label>
+      <div class="row">
+        <select id="extends"></select>
+        <button id="copyBase" title="Take over all colors of the base theme">Apply</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="row" style="justify-content: space-between; margin-bottom: 7px">
+        <span class="group-title" style="margin:0">Colors</span>
+        <button id="generate" title="Generate a harmonious palette">✨ Generate palette</button>
+      </div>
+      <div class="colors" id="colors"></div>
+    </div>
+
+    <div class="field">
+      <label>Animated scene</label>
+      <div class="seg" id="sceneSeg">
+        <button data-v="off">off</button>
+        <button data-v="rain">rain</button>
+        <button data-v="waves">waves</button>
+        <button data-v="grid">grid</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Background image</label>
+      <div class="drop" id="drop">Drop a PNG, JPG or GIF here or <u>choose a file</u></div>
+      <input type="file" id="file" accept="image/png,image/jpeg,image/gif" hidden>
+      <div class="gallery" id="gallery"></div>
+      <div id="imageControls" style="margin-top: 12px">
+        <div class="row" style="justify-content: space-between">
+          <span class="note" style="margin:0">Brightness <b id="brightVal"></b></span>
+          <button id="noImage" class="ghost">No image</button>
+        </div>
+        <input type="range" id="bright" min="0.1" max="1" step="0.05" value="0.45">
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="save" class="primary">Save theme</button>
+      <button id="saveDefault">Save &amp; use as default</button>
+      <button id="exportOne" title="Download this theme, including unsaved changes and its image">Export</button>
+      <button id="delete" class="danger">Delete</button>
+    </div>
+    <div class="note" id="pathNote"></div>
+  </div>
+</main>
+<div id="toast"></div>
+
+<script>
+"use strict";
+const TOKEN = "__TOKEN__";
+const $ = (s) => document.querySelector(s);
+
+// ---------- api ----------
+async function api(path, body, isForm) {
+  const opts = { headers: { "X-Token": TOKEN } };
+  if (body !== undefined) {
+    opts.method = "POST";
+    if (isForm) opts.body = body;
+    else { opts.body = JSON.stringify(body); opts.headers["Content-Type"] = "application/json"; }
+  }
+  const res = await fetch(path, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+const imgURL = (p) => `/img?t=${TOKEN}&p=${encodeURIComponent(p)}`;
+
+let toastTimer;
+function toast(msg, err) {
+  const t = $("#toast");
+  t.textContent = msg; t.className = "show" + (err ? " err" : "");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = "", 2600);
+}
+
+// ---------- color helpers ----------
+const hexToRgb = (h) => { const v = parseInt(h.slice(1), 16); return [v >> 16 & 255, v >> 8 & 255, v & 255]; };
+const rgbToHex = (c) => "#" + c.map((x) => Math.round(Math.max(0, Math.min(255, x))).toString(16).padStart(2, "0")).join("");
+const mix = (a, b, t) => { const A = hexToRgb(a), B = hexToRgb(b); t = Math.max(0, Math.min(1, t)); return rgbToHex(A.map((v, i) => v + (B[i] - v) * t)); };
+function hsl(h, s, l) {
+  h = ((h % 360) + 360) % 360 / 360; s /= 100; l /= 100;
+  const f = (n) => { const k = (n + h * 12) % 12; const a = s * Math.min(l, 1 - l); return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); };
+  return rgbToHex([f(0) * 255, f(8) * 255, f(4) * 255]);
+}
+
+// ---------- state ----------
+let state = { themes: [], images: [], default: "" };
+let cur = null;       // theme being edited
+let phase = "focus";
+const COLOR_FIELDS = [
+  ["focus", 0, "Focus A"], ["focus", 1, "Focus B"],
+  ["break", 0, "Break A"], ["break", 1, "Break B"],
+  ["long", 0, "Long A"], ["long", 1, "Long B"],
+  ["text", null, "Text"], ["muted", null, "Muted"], ["surface", null, "Surface"],
+];
+
+function clone(t) { return JSON.parse(JSON.stringify(t)); }
+const getColor = (k, i) => i === null ? cur[k] : cur[k][i];
+function setColor(k, i, v) { if (i === null) cur[k] = v; else cur[k][i] = v; }
+
+async function load(selectName) {
+  state = await api("/api/state");
+  if (state.warning) toast(state.warning, true);
+  renderLists();
+  const pick = selectName || (cur && cur.name) || state.default;
+  const t = state.themes.find((x) => x.name === pick) || state.themes[0];
+  select(t);
+  renderGallery();
+}
+
+function select(t) {
+  cur = clone(t);
+  if (!cur.extends) cur.extends = t.custom ? (t.extends || "") : t.name;
+  if (!cur.imageBrightness) cur.imageBrightness = 0.45;
+  renderEditor(); renderLists(); loadPreviewImage();
+}
+
+// ---------- rendering of the side lists ----------
+function swatch(t) {
+  return `<span class="swatch">${[t.focus[0], t.focus[1], t.break[0], t.long[0]].map((c) => `<i style="background:${c}"></i>`).join("")}</span>`;
+}
+function renderLists() {
+  const item = (t) => `<button class="theme-item ${cur && cur.name === t.name ? "active" : ""}" data-name="${t.name}">
+      ${swatch(t)}<span>${t.name}</span>${t.name === state.default ? "<small>default</small>" : ""}</button>`;
+  $("#customList").innerHTML = state.themes.filter((t) => t.custom).map(item).join("") ||
+    `<div class="note" style="padding: 0 8px">No custom themes yet.</div>`;
+  $("#builtinList").innerHTML = state.themes.filter((t) => !t.custom).map(item).join("");
+  document.querySelectorAll(".theme-item").forEach((b) => b.onclick = () => select(state.themes.find((t) => t.name === b.dataset.name)));
+}
+
+function renderEditor() {
+  $("#name").value = cur.name;
+  $("#description").value = cur.description || "";
+  $("#author").value = cur.author || "";
+  const ext = $("#extends");
+  ext.innerHTML = `<option value="">nothing</option>` + state.themes.filter((t) => t.name !== cur.name)
+    .map((t) => `<option ${t.name === cur.extends ? "selected" : ""}>${t.name}</option>`).join("");
+  const box = $("#colors");
+  box.innerHTML = "";
+  COLOR_FIELDS.forEach(([k, i, label]) => {
+    const el = document.createElement("div");
+    el.className = "color";
+    el.innerHTML = `<input type="color"><span>${label}</span><input type="text" maxlength="7" spellcheck="false">`;
+    const [picker, , text] = el.children;
+    const sync = (v) => { picker.value = v; text.value = v; };
+    sync(getColor(k, i));
+    picker.oninput = () => { setColor(k, i, picker.value); text.value = picker.value; changed(); };
+    text.oninput = () => { if (/^#[0-9a-fA-F]{6}$/.test(text.value)) { setColor(k, i, text.value.toLowerCase()); picker.value = text.value; changed(); } };
+    box.appendChild(el);
+  });
+  document.querySelectorAll("#sceneSeg button").forEach((b) => b.classList.toggle("on", b.dataset.v === cur.scene));
+  $("#bright").value = cur.imageBrightness;
+  $("#brightVal").textContent = Math.round(cur.imageBrightness * 100) + "%";
+  $("#imageControls").style.display = cur.image ? "" : "none";
+  renderGallery(); updateNotes();
+}
+
+function updateNotes() {
+  const existing = state.themes.find((t) => t.name === cur.name);
+  let note = "";
+  if (existing && existing.builtin && !existing.custom) note = "Saving under a built-in name modifies that theme for you.";
+  else if (existing && existing.custom) note = "Saving overwrites your theme file.";
+  $("#nameNote").textContent = note;
+  $("#delete").disabled = !(existing && existing.custom);
+  $("#pathNote").textContent = `Theme folder ${state.dir}`;
+}
+
+function renderGallery() {
+  const g = $("#gallery");
+  const imgs = [...(state.images || [])];
+  if (cur && cur.image && !imgs.includes(cur.image)) imgs.unshift(cur.image);
+  g.innerHTML = imgs.map((p) => `<button class="${cur && cur.image === p ? "on" : ""}" data-p="${encodeURIComponent(p)}" title="${p.split("/").pop()}">
+      <img src="${imgURL(p)}" loading="lazy" alt=""></button>`).join("");
+  g.querySelectorAll("button").forEach((b) => b.onclick = () => { cur.image = decodeURIComponent(b.dataset.p); renderEditor(); loadPreviewImage(); });
+}
+
+function changed() { /* preview redraws every frame */ }
+
+// ---------- editor events ----------
+$("#name").oninput = (e) => { cur.name = e.target.value.trim().toLowerCase(); updateNotes(); };
+$("#extends").onchange = (e) => { cur.extends = e.target.value; };
+$("#description").oninput = (e) => { cur.description = e.target.value; };
+$("#author").oninput = (e) => { cur.author = e.target.value; };
+
+// ---------- import / export (.spomotheme) ----------
+function download(name, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+async function exportThemes(body, filename) {
+  try {
+    const res = await fetch("/api/export", { method: "POST", headers: { "X-Token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const text = await res.text();
+    if (!res.ok) throw new Error((JSON.parse(text).error) || res.statusText);
+    const count = JSON.parse(text).themes.length;
+    download(filename, text);
+    toast(`exported ${count} theme${count > 1 ? "s" : ""} as ${filename}`);
+  } catch (e) { toast(e.message, true); }
+}
+$("#exportOne").onclick = () => exportThemes({ themes: [cur] }, `${cur.name || "theme"}.spomotheme`);
+$("#exportAll").onclick = () => exportThemes({ all: true }, "superpomodoro-themes.spomotheme");
+
+async function importFile(file) {
+  if (!file) return;
+  try {
+    const res = await fetch("/api/import", { method: "POST", headers: { "X-Token": TOKEN, "X-Filename": file.name }, body: file });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    const renamed = Object.entries(data.renamed || {}).filter(([a, b]) => a !== b);
+    toast(`imported ${data.imported.join(", ")}` + (renamed.length ? ` (renamed: ${renamed.map(([a, b]) => `${a} → ${b}`).join(", ")})` : ""));
+    await load(data.imported[0]);
+  } catch (e) { toast(e.message, true); }
+}
+$("#importBtn").onclick = () => $("#importFile").click();
+$("#importFile").onchange = (e) => { importFile(e.target.files[0]); e.target.value = ""; };
+const isThemeFile = (f) => f && /\.(spomotheme|json|theme)$/i.test(f.name);
+$("#copyBase").onclick = () => {
+  const b = state.themes.find((t) => t.name === cur.extends);
+  if (!b) return toast("pick a base theme first", true);
+  ["focus", "break", "long"].forEach((k) => cur[k] = [...b[k]]);
+  ["text", "muted", "surface", "scene"].forEach((k) => cur[k] = b[k]);
+  renderEditor(); toast(`colors of ${b.name} applied`);
+};
+$("#generate").onclick = () => {
+  const h = Math.random() * 360, spread = 25 + Math.random() * 35;
+  cur.focus = [hsl(h, 85, 66), hsl(h + spread, 80, 68)];
+  cur.break = [hsl(h + 150, 65, 64), hsl(h + 150 + spread, 60, 68)];
+  cur.long = [hsl(h + 230, 65, 70), hsl(h + 230 + spread, 60, 72)];
+  cur.text = hsl(h, 25, 90); cur.muted = hsl(h, 14, 52); cur.surface = hsl(h, 20, 20);
+  renderEditor();
+};
+document.querySelectorAll("#sceneSeg button").forEach((b) => b.onclick = () => { cur.scene = b.dataset.v; renderEditor(); });
+document.querySelectorAll("#phaseSeg button").forEach((b) => b.onclick = () => {
+  phase = b.dataset.v; document.querySelectorAll("#phaseSeg button").forEach((x) => x.classList.toggle("on", x === b));
+});
+$("#bright").oninput = (e) => { cur.imageBrightness = +e.target.value; $("#brightVal").textContent = Math.round(cur.imageBrightness * 100) + "%"; };
+$("#noImage").onclick = () => { cur.image = ""; renderEditor(); loadPreviewImage(); };
+
+$("#newTheme").onclick = () => {
+  const base = cur || state.themes[0];
+  let n = "my-theme", i = 2;
+  while (state.themes.some((t) => t.name === n)) n = `my-theme-${i++}`;
+  select(Object.assign(clone(base), { name: n, custom: false, builtin: false, extends: base.name }));
+  $("#name").focus(); $("#name").select();
+};
+
+async function save(asDefault) {
+  try {
+    const r = await api("/api/save", cur);
+    if (asDefault) await api("/api/default", { name: cur.name });
+    toast(asDefault ? `${cur.name} saved and set as default` : `saved to ${r.path.split("/").slice(-2).join("/")}`);
+    await load(cur.name);
+  } catch (e) { toast(e.message, true); }
+}
+$("#save").onclick = () => save(false);
+$("#saveDefault").onclick = () => save(true);
+$("#delete").onclick = async () => {
+  if (!confirm(`Delete the theme file for ${cur.name}?`)) return;
+  try { await api("/api/delete", { name: cur.name }); toast(`${cur.name} deleted`); cur = null; await load(); }
+  catch (e) { toast(e.message, true); }
+};
+$("#openThemes").onclick = () => api("/api/open", { what: "themes" }).catch((e) => toast(e.message, true));
+$("#openImages").onclick = () => api("/api/open", { what: "images" }).catch((e) => toast(e.message, true));
+$("#quit").onclick = async () => {
+  await api("/api/quit", {}).catch(() => {});
+  document.body.insertAdjacentHTML("beforeend", `<div class="stopped">Theme editor stopped. You can close this tab.</div>`);
+};
+
+// ---------- image upload ----------
+async function upload(file) {
+  if (!file) return;
+  const fd = new FormData(); fd.append("image", file);
+  try {
+    const r = await api("/api/upload", fd, true);
+    cur.image = r.path;
+    state.images = (await api("/api/state")).images || [];
+    renderEditor(); loadPreviewImage(); toast("image added");
+  } catch (e) { toast(e.message, true); }
+}
+const drop = $("#drop");
+drop.onclick = () => $("#file").click();
+$("#file").onchange = (e) => upload(e.target.files[0]);
+["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; isThemeFile(f) ? importFile(f) : upload(f); });
+document.addEventListener("dragover", (e) => e.preventDefault());
+document.addEventListener("drop", (e) => {
+  e.preventDefault();
+  if (e.target === drop) return;
+  const f = e.dataTransfer.files[0];
+  isThemeFile(f) ? importFile(f) : upload(f);
+});
+
+// ---------- preview: a faithful mini SuperPomodoro ----------
+const COLS = 96, ROWS = 32;
+const cv = $("#preview"), ctx = cv.getContext("2d");
+const dpr = window.devicePixelRatio || 1;
+ctx.font = "15px Menlo, Monaco, Consolas, monospace";
+const CW = Math.ceil(ctx.measureText("M").width), CH = 19;
+cv.width = COLS * CW * dpr; cv.height = ROWS * CH * dpr;
+cv.style.width = COLS * CW + "px";
+ctx.scale(dpr, dpr);
+
+const GLYPHS = {
+  "0": ["###", "#.#", "#.#", "#.#", "###"], "1": [".#.", "##.", ".#.", ".#.", "###"],
+  "2": ["###", "..#", "###", "#..", "###"], "3": ["###", "..#", ".##", "..#", "###"],
+  "4": ["#.#", "#.#", "###", "..#", "..#"], "5": ["###", "#..", "###", "..#", "###"],
+  "6": ["###", "#..", "###", "#.#", "###"], "7": ["###", "..#", ".#.", ".#.", ".#."],
+  "8": ["###", "#.#", "###", "#.#", "###"], "9": ["###", "#.#", "###", "..#", "###"],
+  ":": [".", "#", ".", "#", "."],
+};
+let previewImg = null, pixelCanvas = null;
+function loadPreviewImage() {
+  previewImg = null; pixelCanvas = null;
+  if (!cur || !cur.image) return;
+  const im = new Image();
+  im.onload = () => {
+    previewImg = im;
+    // the terminal draws two pixels per cell, so downsample to COLS x ROWS*2
+    const pc = document.createElement("canvas"); pc.width = COLS; pc.height = ROWS * 2;
+    const c = pc.getContext("2d");
+    const s = Math.max(COLS / im.width, (ROWS * 2) / im.height);
+    const w = im.width * s, h = im.height * s;
+    c.drawImage(im, (COLS - w) / 2, (ROWS * 2 - h) / 2, w, h);
+    pixelCanvas = pc;
+  };
+  im.src = imgURL(cur.image);
+}
+
+const rain = Array.from({ length: COLS / 2 }, (_, i) => ({ x: i * 2, y: Math.random() * ROWS * 2 - ROWS, v: 7 + Math.random() * 14, n: 6 + Math.floor(Math.random() * 16) }));
+const KATA = "ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789";
+let last = performance.now(), t0 = performance.now();
+
+function colorsFor() { return phase === "break" ? cur.break : phase === "long" ? cur.long : cur.focus; }
+function label() { return { focus: "FOCUS", break: "SHORT BREAK", long: "LONG BREAK" }[phase]; }
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (!cur) return;
+  const dt = Math.min((now - last) / 1000, 0.1); last = now;
+  const t = (now - t0) / 1000;
+  const termBg = $("#termBg").value;
+  const [ca, cb] = colorsFor();
+  const base = pixelCanvas ? "#000000" : termBg;
+  const dim = (c, f) => mix(base, c, f);
+  const cell = (x, y, ch, color, bold) => {
+    ctx.fillStyle = color;
+    if (ch === "█") { ctx.fillRect(x * CW, y * CH, CW + 0.5, CH + 0.5); return; }
+    ctx.font = (bold ? "bold " : "") + "15px Menlo, Monaco, Consolas, monospace";
+    ctx.fillText(ch, x * CW, y * CH + 14);
+  };
+  const text = (x, y, s, color, bold) => { [...s].forEach((ch, i) => ch !== " " && cell(x + i, y, ch, color, bold)); };
+  const strip = (x, y, w) => {
+    ctx.fillStyle = pixelCanvas ? "rgba(0,0,0,.72)" : termBg;
+    ctx.fillRect((x - 2) * CW, y * CH, (w + 4) * CW, CH);
+  };
+
+  // background
+  ctx.fillStyle = termBg; ctx.fillRect(0, 0, COLS * CW, ROWS * CH);
+  if (pixelCanvas) {
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(pixelCanvas, 0, 0, COLS * CW, ROWS * CH);
+    ctx.fillStyle = `rgba(0,0,0,${1 - cur.imageBrightness})`;
+    ctx.fillRect(0, 0, COLS * CW, ROWS * CH);
+  }
+
+  // layout like the terminal app
+  const clockText = "24:57", scale = 2;
+  let cells = 0; [...clockText].forEach((r, i) => { if (i) cells++; cells += GLYPHS[r][0].length; });
+  const clockW = cells * scale * 2;
+  const panelRows = $("#showPanel").checked ? 8 : 1;
+  const total = 2 + 5 * scale + 1 + 1 + 1 + 1 + 1 + panelRows;
+  const top = Math.floor((ROWS - total) / 2);
+  const clockTop = top + 2, barY = clockTop + 5 * scale + 1, statsY = barY + 2, panelY = statsY + 2;
+  const cx0 = Math.floor((COLS - clockW) / 2);
+
+  // scenes
+  if (cur.scene === "rain") {
+    rain.forEach((p) => {
+      p.y += p.v * dt;
+      if (p.y - p.n > ROWS) { p.y = -Math.random() * ROWS; p.v = 7 + Math.random() * 14; }
+      for (let k = 0; k < p.n; k++) {
+        const y = Math.floor(p.y) - k; if (y < 0 || y >= ROWS) continue;
+        const f = 1 - k / p.n;
+        cell(p.x, y, KATA[(p.x * 7 + y * 13 + Math.floor(t * 3)) % KATA.length], k === 0 ? dim(cur.text, .85) : dim(ca, .15 + .55 * f));
+      }
+    });
+  } else if (cur.scene === "waves") {
+    const baseY = ROWS * .7;
+    for (let x = 0; x < COLS; x++) {
+      const hy = baseY + 1.6 * Math.sin(x * .11 + t * 1.3) + .9 * Math.sin(x * .29 - t * .8);
+      for (let y = Math.floor(hy); y < ROWS; y++) {
+        const d = y - hy, n = Math.sin(x * .21 + y * .9 - t * 1.6) + .6 * Math.sin(x * .07 + t * .5 + y * .3);
+        const depth = 1 - Math.min(d / (ROWS - baseY + 2), 1) * .7;
+        if (d < 1) cell(x, y, n > 1.1 ? "°" : "~", dim(mix(cb, cur.text, .4), .85));
+        else if (n > .7) cell(x, y, "≈", dim(ca, .55 * depth));
+        else if (n > -.2) cell(x, y, "~", dim(mix(ca, cb, .5), .35 * depth));
+        else if (n > -.9) cell(x, y, "-", dim(cb, .22 * depth));
+      }
+    }
+  } else if (cur.scene === "grid") {
+    const hz = barY + 2, cxm = COLS / 2, r = 5 * scale * .75 + 3;
+    for (let y = 0; y < hz; y++) {
+      const dy = hz - y - .5; if (dy > r) continue;
+      const rel = dy / r, k = hz - y;
+      if ((rel < .6 && k % 3 === 1) || (rel < .3 && k % 2 === 0)) continue;
+      const half = Math.sqrt(Math.max(r * r - dy * dy, 0)) * 2.1;
+      ctx.fillStyle = dim(mix(cur.focus[0], cur.focus[1], rel), .4);
+      ctx.fillRect((cxm - half) * CW, y * CH, half * 2 * CW, CH / 2);
+    }
+    ctx.fillStyle = dim(cur.focus[0], .85); ctx.fillRect(0, hz * CH + CH / 2 - 1.5, COLS * CW, 3);
+    const K = (ROWS - hz) * 2.2, off = (t * .6) % 1;
+    for (let y = hz + 1; y < ROWS; y++) {
+      const d = y - hz, near = Math.min(d / (ROWS - hz), 1);
+      if (d >= 2 && Math.floor(K / d / 2 + off) !== Math.floor(K / (d + 1) / 2 + off)) {
+        ctx.fillStyle = dim(cur.focus[0], .15 + .55 * near); ctx.fillRect(0, y * CH + CH / 2, COLS * CW, 1.2);
+      }
+      for (let x = 0; x < COLS; x++) if (Math.floor((x - cxm) / d / 5) !== Math.floor((x + 1 - cxm) / d / 5)) {
+        cell(x, y, x < cxm - d * 1.5 ? "╱" : x > cxm + d * 1.5 ? "╲" : "│", dim(cur.long[0], .2 + .5 * near));
+      }
+    }
+  }
+
+  // header
+  const head = "● " + label();
+  strip(Math.floor((COLS - head.length) / 2), top, head.length);
+  text(Math.floor((COLS - head.length) / 2), top, head, ca, true);
+
+  // digits
+  for (let y = 0; y < 5 * scale; y++) {
+    let x = 0;
+    [...clockText].forEach((r, i) => {
+      if (i) x += scale;
+      for (const chx of GLYPHS[r][Math.floor(y / scale)]) {
+        for (let k = 0; k < scale; k++) {
+          if (chx === "#") {
+            const tt = x / cells * .8 + y / (5 * scale) * .2;
+            ctx.fillStyle = mix(ca, cb, tt);
+            ctx.fillRect((cx0 + x * 2) * CW, (clockTop + y) * CH, CW * 2 + .5, CH + .5);
+          }
+          x++;
+        }
+      }
+    });
+  }
+
+  // progress bar at 40%
+  const bw = clockW, fill = Math.round(bw * .4);
+  strip(cx0, barY, bw + 6);
+  for (let i = 0; i < bw; i++) {
+    if (i < fill) { ctx.fillStyle = mix(ca, cb, i / bw); ctx.fillRect((cx0 + i) * CW, barY * CH + 2, CW + .5, CH - 4); }
+    else { ctx.fillStyle = cur.surface; ctx.globalAlpha = .9; ctx.fillRect((cx0 + i) * CW + 1, barY * CH + 4, CW - 2, CH - 8); ctx.globalAlpha = 1; }
+  }
+  text(cx0 + bw + 2, barY, " 40%", cur.muted);
+
+  // stats
+  const stats = "● ◉ ○ ○   today 3 sessions · 1h15m";
+  const sx = Math.floor((COLS - stats.length) / 2);
+  strip(sx, statsY, stats.length);
+  text(sx, statsY, "● ◉", ca); text(sx + 4, statsY, "○ ○", cur.surface); text(sx + 10, statsY, stats.slice(10), cur.muted);
+
+  // shortcut panel
+  if ($("#showPanel").checked) {
+    const pw = 74, px = Math.floor((COLS - pw) / 2), py = panelY;
+    const panel = mix(pixelCanvas ? "#0e0e12" : termBg, "#000000", .4);
+    ctx.fillStyle = panel; ctx.fillRect(px * CW, py * CH, pw * CW, 7 * CH);
+    ctx.strokeStyle = mix(panel, cur.muted, .55); ctx.lineWidth = 1;
+    ctx.strokeRect(px * CW + 4.5, py * CH + CH / 2, pw * CW - 9, 6 * CH);
+    text(px + 3, py + 1, "TIMER", cur.muted, true); text(px + 26, py + 1, "LOOK", cur.muted, true); text(px + 52, py + 1, "VIEW", cur.muted, true);
+    const rows = [
+      ["space", "pause", "t", "theme", cur.name || "theme", "m", "sound", "on"],
+      ["s", "skip phase", "f", "font", "block", "w", "mini window", "off"],
+      ["r", "restart", "b", "bar", "smooth", "z", "zen mode", ""],
+      ["+ / -", "one minute", "g", "scene", cur.scene, "k", "hide keys", ""],
+    ];
+    rows.forEach((r, i) => {
+      const y = py + 2 + i;
+      text(px + 3, y, r[0], ca, true); text(px + 9, y, r[1], cur.text);
+      text(px + 26, y, r[2], ca, true); text(px + 29, y, r[3], cur.text);
+      const on = r[4] !== "off";
+      ctx.fillStyle = on ? ca : mix(panel, cur.muted, .35);
+      ctx.fillRect((px + 36) * CW, y * CH + 1, 13 * CW, CH - 2);
+      text(px + 37, y, String(r[4]).slice(0, 11), on ? panel : cur.text, true);
+      text(px + 52, y, r[5], ca, true); text(px + 55, y, r[6], cur.text);
+      if (r[7]) {
+        ctx.fillStyle = r[7] === "on" ? ca : mix(panel, cur.muted, .35);
+        ctx.fillRect((px + 68) * CW, y * CH + 1, 5 * CW, CH - 2);
+        text(px + 69, y, r[7], r[7] === "on" ? panel : cur.text, true);
+      }
+    });
+  } else {
+    const k = "k  show shortcuts", kx = Math.floor((COLS - k.length) / 2);
+    strip(kx, panelY, k.length); text(kx, panelY, "k", cur.text); text(kx + 3, panelY, k.slice(3), cur.muted);
+  }
+}
+
+load().catch((e) => toast(e.message, true));
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

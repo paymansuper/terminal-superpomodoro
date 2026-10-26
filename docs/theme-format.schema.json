@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/paymansuper/terminal-superpomodoro/blob/main/docs/theme-format.schema.json",
+  "title": "SuperPomodoro theme package",
+  "description": "Exchange format for SuperPomodoro themes (.spomotheme), version 1.",
+  "type": "object",
+  "required": ["format", "version", "themes"],
+  "properties": {
+    "format": { "const": "superpomodoro-theme" },
+    "version": { "const": 1 },
+    "generator": { "type": "string", "description": "Program that wrote the file." },
+    "exported": { "type": "string", "format": "date-time" },
+    "themes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/theme" }
+    }
+  },
+  "$defs": {
+    "color": { "type": "string", "pattern": "^#?[0-9a-fA-F]{6}$" },
+    "pair": {
+      "type": "array",
+      "prefixItems": [{ "$ref": "#/$defs/color" }, { "$ref": "#/$defs/color" }],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "theme": {
+      "type": "object",
+      "required": ["name", "colors"],
+      "properties": {
+        "name": { "type": "string", "description": "Lowercase letters, digits and dashes, max 32 characters. Other names are sanitized on import." },
+        "description": { "type": "string", "maxLength": 200 },
+        "author": { "type": "string", "maxLength": 80 },
+        "extends": { "type": "string", "description": "Informational only. Colors are always complete." },
+        "colors": {
+          "type": "object",
+          "required": ["focus", "break", "long", "text", "muted", "surface"],
+          "properties": {
+            "focus": { "$ref": "#/$defs/pair" },
+            "break": { "$ref": "#/$defs/pair" },
+            "long": { "$ref": "#/$defs/pair" },
+            "text": { "$ref": "#/$defs/color" },
+            "muted": { "$ref": "#/$defs/color" },
+            "surface": { "$ref": "#/$defs/color" }
+          },
+          "additionalProperties": false
+        },
+        "scene": { "enum": ["off", "rain", "waves", "grid"], "default": "off" },
+        "image": {
+          "type": "object",
+          "required": ["file", "data"],
+          "properties": {
+            "file": { "type": "string", "description": "Original file name, extension png, jpg, jpeg or gif." },
+            "brightness": { "type": "number", "minimum": 0, "maximum": 1 },
+            "data": { "type": "string", "contentEncoding": "base64", "description": "The image file, at most 20 MB." }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

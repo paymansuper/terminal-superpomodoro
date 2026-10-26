@@ -1,0 +1,20 @@
+version: 2
+project_name: superpomodoro
+
+builds:
+  - main: ./cmd/superpomodoro
+    binary: superpomodoro
+    env: [CGO_ENABLED=0]
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    ldflags: ["-s -w -X main.version={{.Version}}"]
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+
+# Homebrew is served by the source formula in Formula/ (see release workflow),
+# because the macOS mini window is built with swiftc on the user's machine.

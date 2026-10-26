@@ -1,0 +1,13 @@
+# Example custom theme for SuperPomodoro.
+# Copy it to ~/.config/superpomodoro/themes/ and run: spomo --theme fjord
+
+extends = "nord"
+
+focus   = "#5e81ac #88c0d0"
+break   = "#a3be8c #ebcb8b"
+long    = "#b48ead #88c0d0"
+
+scene   = "waves"
+
+# image = "~/Pictures/fjord.jpg"
+# image_brightness = 0.4
