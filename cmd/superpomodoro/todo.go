@@ -5,7 +5,8 @@ package main
 //   - [ ] Write investor update <!-- pomodoros: 2, current -->
 //   - [x] Review NDA
 //
-// The comment keeps the pomodoro count and which task is the current focus.
+// The comment keeps the pomodoro count and which tasks are planned for the
+// current focus session ("current").
 // Changes made in another editor are picked up while the timer runs.
 
 import (
@@ -120,31 +121,57 @@ func (a *App) reloadTodosIfChanged() {
 	}
 }
 
-func (a *App) currentTask() *todo {
+// sessionTasks are the tasks planned for the current focus session, done ones
+// included until the session ends so you see what you ticked off.
+func (a *App) sessionTasks() []int {
+	var out []int
 	for i := range a.todos {
-		if a.todos[i].Current && !a.todos[i].Done {
-			return &a.todos[i]
+		if a.todos[i].Current {
+			out = append(out, i)
 		}
 	}
-	return nil
+	return out
 }
 
-func (a *App) setCurrent(i int) {
-	was := a.todos[i].Current
-	for j := range a.todos {
-		a.todos[j].Current = false
+// toggleSession adds a task to this focus session or takes it out again.
+func (a *App) toggleSession(i int) {
+	t := &a.todos[i]
+	if t.Done && !t.Current {
+		a.setFlash("this task is done, press x to open it again")
+		return
 	}
-	a.todos[i].Current = !was && !a.todos[i].Done
+	t.Current = !t.Current
 	a.saveTodos()
-	if a.todos[i].Current {
-		a.setFlash("focusing on · " + a.todos[i].Text)
+	if t.Current {
+		a.setFlash("added to this session · " + t.Text)
 	}
 }
 
-// creditPomodoro counts a finished focus phase for the current task.
-func (a *App) creditPomodoro() {
-	if t := a.currentTask(); t != nil {
+// toggleDone ticks a task off (or opens it again), used by keys and the mini window.
+func (a *App) toggleDone(i int) {
+	if i < 0 || i >= len(a.todos) {
+		return
+	}
+	a.todos[i].Done = !a.todos[i].Done
+	a.saveTodos()
+}
+
+// endSession runs when a focus phase completes: every planned task gets the
+// pomodoro, finished ones leave the session, open ones stay for the next one.
+func (a *App) endSession() {
+	changed := false
+	for i := range a.todos {
+		t := &a.todos[i]
+		if !t.Current {
+			continue
+		}
 		t.Pomos++
+		if t.Done {
+			t.Current = false
+		}
+		changed = true
+	}
+	if changed {
 		a.saveTodos()
 	}
 }
@@ -181,7 +208,7 @@ func todoCommand(args []string) int {
 			}
 			extra := ""
 			if t.Current {
-				extra += "  ← current"
+				extra += "  ← this session"
 			}
 			if t.Pomos > 0 {
 				extra += fmt.Sprintf("  (%d pomodoros)", t.Pomos)
@@ -202,15 +229,13 @@ func todoCommand(args []string) int {
 		if !ok {
 			return 2
 		}
-		list[i].Done, list[i].Current = !list[i].Done, false
+		list[i].Done = !list[i].Done
 	case "focus", "f":
 		i, ok := index()
 		if !ok {
 			return 2
 		}
-		for j := range list {
-			list[j].Current = j == i && !list[i].Done
-		}
+		list[i].Current = !list[i].Current
 	case "rm", "delete", "del":
 		i, ok := index()
 		if !ok {
@@ -230,7 +255,7 @@ func todoCommand(args []string) int {
 		fmt.Println(todoPath())
 		return 0
 	default:
-		fmt.Fprintln(os.Stderr, "usage: superpomodoro todo [list|add <text>|done <n>|focus <n>|rm <n>|clear|path]")
+		fmt.Fprintln(os.Stderr, "usage: superpomodoro todo [list|add <text>|done <n>|focus <n> (add to or remove from the session)|rm <n>|clear|path]")
 		return 2
 	}
 	if err := saveTodos(list); err != nil {

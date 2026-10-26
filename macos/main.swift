@@ -34,7 +34,13 @@ struct TimerState: Decodable {
     var imageFit: String?      // "cover" or "contain", resolved by the terminal app
     var imageScale: Double?
     var imagePosition: String?
-    var task: String?          // current to-do, if one is set as focus
+    var tasks: [TaskItem]?     // to-dos planned for this focus session
+}
+
+struct TaskItem: Decodable {
+    var id: Int
+    var text: String
+    var done: Bool
 }
 
 extension Color {
@@ -55,6 +61,8 @@ func clockString(_ secs: Double) -> String {
     if t >= 3600 { return String(format: "%d:%02d:%02d", t / 3600, (t / 60) % 60, t % 60) }
     return String(format: "%02d:%02d", t / 60, t % 60)
 }
+
+let maxTasks = 5
 
 final class Model: ObservableObject {
     @Published var state: TimerState?
@@ -151,11 +159,9 @@ struct FloatView: View {
                 Text(s.phase)
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .foregroundColor(Color(hex: s.muted))
-                Text(s.task ?? statusText(s))
+                Text(statusText(s))
                     .font(.system(size: 10, weight: .regular, design: .rounded))
-                    .foregroundColor(Color(hex: s.task == nil ? s.muted : s.text).opacity(0.85))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                    .foregroundColor(Color(hex: s.muted).opacity(0.8))
                 Spacer(minLength: 4)
                 if model.hovering { controls(s) }
             }
@@ -164,6 +170,7 @@ struct FloatView: View {
                 .foregroundStyle(gradient(s))
                 .opacity(s.running || s.ready ? 1 : 0.55)
             progress(s, height: 4)
+            taskList(s, fontSize: 11)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -178,6 +185,40 @@ struct FloatView: View {
                 hiddenKey("s") { send("skip") }
             }
         )
+    }
+
+    /// The to-dos of this focus session, a click ticks one off in the terminal app too.
+    @ViewBuilder
+    private func taskList(_ s: TimerState, fontSize: CGFloat) -> some View {
+        if let tasks = s.tasks, !tasks.isEmpty {
+            VStack(alignment: .leading, spacing: 3) {
+                ForEach(Array(tasks.prefix(maxTasks)), id: \.id) { t in
+                    Button(action: { send("task:\(t.id)") }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: t.done ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: fontSize - 1))
+                                .foregroundColor(t.done ? Color(hex: s.colorA) : Color(hex: s.muted))
+                            Text(t.text)
+                                .font(.system(size: fontSize, design: .rounded))
+                                .foregroundColor(Color(hex: t.done ? s.muted : s.text))
+                                .strikethrough(t.done)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                            Spacer(minLength: 0)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(t.done ? "Mark as open" : "Mark as done")
+                }
+                if tasks.count > maxTasks {
+                    Text("+\(tasks.count - maxTasks) more")
+                        .font(.system(size: fontSize - 1, design: .rounded))
+                        .foregroundColor(Color(hex: s.muted))
+                }
+            }
+            .padding(.top, 2)
+        }
     }
 
     private func hiddenKey(_ key: Character, _ action: @escaping () -> Void) -> some View {
@@ -220,6 +261,15 @@ struct FloatView: View {
             Text("next up · \(next)")
                 .font(.system(size: 12, weight: .medium, design: .rounded))
                 .foregroundColor(Color(hex: s.muted))
+            if let tasks = s.tasks, !tasks.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Tick off what you finished")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundColor(Color(hex: s.muted))
+                    taskList(s, fontSize: 13)
+                }
+                .frame(maxWidth: 340, alignment: .leading)
+            }
             HStack(spacing: 10) {
                 Button(s.running ? "Continue" : "Start \(next)") { send("start") }
                     .keyboardShortcut(.defaultAction)
@@ -266,8 +316,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var timer: Timer?
     var hotKeyRef: EventHotKeyRef?
 
-    let compactSize = NSSize(width: 236, height: 88)
-    let expandedSize = NSSize(width: 500, height: 280)
+    var taskRows: Int {
+        let n = model.state?.tasks?.count ?? 0
+        return n == 0 ? 0 : min(n, maxTasks) + (n > maxTasks ? 1 : 0)
+    }
+    var compactSize: NSSize {
+        NSSize(width: 236, height: 88 + (taskRows > 0 ? CGFloat(taskRows) * 19 + 6 : 0))
+    }
+    var expandedSize: NSSize {
+        NSSize(width: 500, height: 280 + (taskRows > 0 ? CGFloat(taskRows) * 21 + 26 : 0))
+    }
+    var lastTaskRows = 0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppDelegate.shared = self
@@ -333,6 +392,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         model.state = s
+        if taskRows != lastTaskRows {
+            // grow or shrink with the task list, keeping the top edge where it is
+            lastTaskRows = taskRows
+            let old = panel.frame
+            let size = model.expanded ? expandedSize : compactSize
+            var frame = NSRect(x: old.minX, y: old.maxY - size.height, width: size.width, height: size.height)
+            if model.expanded { frame = centerFrame() }
+            panel.setFrame(frame, display: true, animate: true)
+            if !model.expanded { compactOrigin = frame.origin }
+        }
         if s.image != model.imagePath {
             model.imagePath = s.image
             model.image = s.image.flatMap { NSImage(contentsOfFile: $0) }

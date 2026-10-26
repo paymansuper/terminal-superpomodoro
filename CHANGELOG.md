@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.1
+
+- Focus sessions can hold several tasks: `return` in the list adds a task to the session or takes it out
+- Session tasks show under the timer and as a clickable checklist in the mini window, also in the big window when a phase ends
+- When a focus phase ends every session task gets the pomodoro, done tasks leave the session, open ones carry over
+
 ## v0.3.0
 
 - To-do list in the timer (`l`): add, edit, reorder, mark done and focus on a task, pomodoros are counted per task, stored as a Markdown checklist

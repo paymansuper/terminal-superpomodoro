@@ -11,33 +11,40 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 )
 
+type miniTask struct {
+	ID   int    `json:"id"`
+	Text string `json:"text"`
+	Done bool   `json:"done"`
+}
+
 type miniState struct {
-	PID       int     `json:"pid"`
-	Mini      bool    `json:"mini"`
-	Phase     string  `json:"phase"`
-	Remaining float64 `json:"remaining"`
-	Total     float64 `json:"total"`
-	Running   bool    `json:"running"`
-	Ready     bool    `json:"ready"`
-	Event     int     `json:"event"`
-	Message   string  `json:"message"`
-	ColorA    string  `json:"colorA"`
-	ColorB    string  `json:"colorB"`
-	Text      string  `json:"text"`
-	Muted     string  `json:"muted"`
-	Surface   string  `json:"surface"`
-	Auto      bool    `json:"auto"`
-	Image     string  `json:"image,omitempty"`
-	ImageBr   float64 `json:"imageBrightness,omitempty"`
-	ImageFit  string  `json:"imageFit,omitempty"`
-	ImageSc   float64 `json:"imageScale,omitempty"`
-	ImagePos  string  `json:"imagePosition,omitempty"`
-	Task      string  `json:"task,omitempty"`
+	PID       int        `json:"pid"`
+	Mini      bool       `json:"mini"`
+	Phase     string     `json:"phase"`
+	Remaining float64    `json:"remaining"`
+	Total     float64    `json:"total"`
+	Running   bool       `json:"running"`
+	Ready     bool       `json:"ready"`
+	Event     int        `json:"event"`
+	Message   string     `json:"message"`
+	ColorA    string     `json:"colorA"`
+	ColorB    string     `json:"colorB"`
+	Text      string     `json:"text"`
+	Muted     string     `json:"muted"`
+	Surface   string     `json:"surface"`
+	Auto      bool       `json:"auto"`
+	Image     string     `json:"image,omitempty"`
+	ImageBr   float64    `json:"imageBrightness,omitempty"`
+	ImageFit  string     `json:"imageFit,omitempty"`
+	ImageSc   float64    `json:"imageScale,omitempty"`
+	ImagePos  string     `json:"imagePosition,omitempty"`
+	Tasks     []miniTask `json:"tasks,omitempty"`
 }
 
 func (c rgb) hexStr() string { return fmt.Sprintf("#%02x%02x%02x", c.r, c.g, c.b) }
@@ -69,8 +76,8 @@ func (a *App) writeMiniState() {
 		ColorA: ca.hexStr(), ColorB: cb.hexStr(), Text: t.Text.hexStr(), Muted: t.Muted.hexStr(),
 		Surface: lerp(t.Surface, rgb{0, 0, 0}, 0.35).hexStr(), Auto: a.cfg.Auto,
 	}
-	if task := a.currentTask(); task != nil {
-		st.Task = task.Text
+	for _, i := range a.sessionTasks() {
+		st.Tasks = append(st.Tasks, miniTask{ID: i, Text: a.todos[i].Text, Done: a.todos[i].Done})
 	}
 	if o := a.imageOptions(); o.Path != "" {
 		st.Image, st.ImageBr, st.ImageSc, st.ImagePos = expandHome(o.Path), o.Bright, o.Scale, o.Pos
@@ -153,6 +160,11 @@ func (a *App) pollMiniCommands() {
 			}
 		case "skip":
 			a.advance(false)
+		default:
+			// task:<n> ticks a task off from the mini window
+			if n, err := strconv.Atoi(strings.TrimPrefix(c, "task:")); err == nil && strings.HasPrefix(c, "task:") {
+				a.toggleDone(n)
+			}
 		case "restore":
 			a.mini = false
 			restoreTerminal()

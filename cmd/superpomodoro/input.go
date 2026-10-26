@@ -247,15 +247,10 @@ func (a *App) handleTodoKey(k key) {
 		a.startInput(-1)
 	case k.r == 'e' && n > 0:
 		a.startInput(a.todoSel)
-	case k.code == kEnter && n > 0:
-		a.setCurrent(a.todoSel)
+	case (k.code == kEnter || k.r == 'f') && n > 0:
+		a.toggleSession(a.todoSel)
 	case (k.r == 'x' || k.r == ' ') && n > 0:
-		t := &a.todos[a.todoSel]
-		t.Done = !t.Done
-		if t.Done {
-			t.Current = false
-		}
-		a.saveTodos()
+		a.toggleDone(a.todoSel)
 	case (k.r == 'd' || k.code == kBackspace) && n > 0:
 		a.todos = append(a.todos[:a.todoSel], a.todos[a.todoSel+1:]...)
 		a.todoSel = min(a.todoSel, max(len(a.todos)-1, 0))
@@ -422,18 +417,18 @@ func (a *App) todoCard(screenW int) []line {
 			}
 			tag := ""
 			if td.Current {
-				tag = "FOCUS"
+				tag = "SESSION"
 			}
-			textW := inner - 3 - 2 - 8 - 5 - 1
+			textW := inner - 3 - 2 - 10 - 5 - 1
 			txtCol := t.Text
 			if td.Done {
 				txtCol = t.Muted
 			}
 			s.cell(truncate(td.Text, textW), textW, txtCol, td.Current)
 			if tag != "" {
-				s.chip(tag, 8, ca, panel)
+				s.chip(tag, 10, ca, panel)
 			} else {
-				s.cell("", 8, t.Text, false)
+				s.cell("", 10, t.Text, false)
 			}
 			s.cell(pom, 5, ca, false)
 			s.cell("", 1, t.Text, false)
@@ -462,7 +457,7 @@ func (a *App) todoCard(screenW int) []line {
 		})
 	} else {
 		rows = append(rows, func(s *seg) {}, func(s *seg) {
-			s.cell("   a add · e edit · enter focus · x done · d delete · c clear · l close", inner, t.Muted, false)
+			s.cell("   a add · enter this session · x done · e edit · d delete · c clear · l close", inner, t.Muted, false)
 		})
 	}
 	return a.card(inner, rows)
@@ -507,4 +502,45 @@ func (a *App) pickerCard(screenW int) []line {
 		s.cell("  ↑↓ choose · return keep · esc cancel", inner, t.Muted, false)
 	})
 	return a.card(inner, rows)
+}
+
+// sessionLines lists the tasks of this focus session under the header.
+func (a *App) sessionLines(w int) []line {
+	t := a.th()
+	ca, _ := a.colors()
+	idx := a.sessionTasks()
+	if len(idx) == 0 {
+		return nil
+	}
+	const maxShown = 4
+	var out []line
+	for n, i := range idx {
+		if n == maxShown {
+			more := fmt.Sprintf("+%d more", len(idx)-maxShown)
+			out = append(out, plain(t.Muted, more))
+			break
+		}
+		td := a.todos[i]
+		box, col := "○ ", t.Text
+		if td.Done {
+			box, col = "● ", t.Muted
+		}
+		txt := truncate(td.Text, max(w-24, 10))
+		pom := ""
+		if td.Pomos > 0 {
+			pom = fmt.Sprintf("  ×%d", td.Pomos)
+		}
+		out = append(out, line{ca.fg() + box + reset + col.fg() + txt + reset + t.Muted.fg() + pom + reset,
+			2 + utf8.RuneCountInString(txt) + utf8.RuneCountInString(pom)})
+	}
+	// pad to one width so the list reads as a left aligned block under the header
+	widest := 0
+	for _, l := range out {
+		widest = max(widest, l.w)
+	}
+	for i := range out {
+		out[i].s += strings.Repeat(" ", widest-out[i].w)
+		out[i].w = widest
+	}
+	return out
 }

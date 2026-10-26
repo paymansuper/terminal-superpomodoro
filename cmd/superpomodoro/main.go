@@ -302,7 +302,7 @@ func (a *App) finish() {
 		Long:  "Long break over. New cycle.",
 	}[prev]
 	if prev == Focus {
-		a.creditPomodoro()
+		a.endSession()
 		a.playSound(a.cfg.SoundFocus)
 	} else {
 		a.playSound(a.cfg.SoundBreak)
@@ -529,14 +529,8 @@ func (a *App) frame() string {
 
 	if !a.cfg.Zen {
 		lines = append(lines, header)
-		if task := a.currentTask(); task != nil {
-			txt := truncate(task.Text, max(w-20, 10))
-			pom := ""
-			if task.Pomos > 0 {
-				pom = fmt.Sprintf("  ×%d", task.Pomos)
-			}
-			lines = append(lines, line{t.Text.fg() + txt + reset + ca.fg() + pom + reset,
-				utf8.RuneCountInString(txt) + utf8.RuneCountInString(pom)})
+		if a.mode != modeTodo && a.mode != modeInput {
+			lines = append(lines, a.sessionLines(w)...)
 		}
 		lines = append(lines, line{})
 	}

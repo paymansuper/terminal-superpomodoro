@@ -430,3 +430,33 @@ func TestTodos(t *testing.T) {
 		t.Fatalf("key parsing: %+v", ks)
 	}
 }
+
+func TestFocusSession(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	a := &App{cfg: defaultConfig(), round: 1, todos: []todo{{Text: "A"}, {Text: "B"}, {Text: "C"}}}
+	a.toggleSession(0)
+	a.toggleSession(2)
+	if got := a.sessionTasks(); len(got) != 2 || got[0] != 0 || got[1] != 2 {
+		t.Fatalf("session: %v", got)
+	}
+	// tick C off from the mini window
+	a.mini = true
+	os.MkdirAll(miniDir(), 0o755)
+	os.WriteFile(cmdPath(), []byte("task:2\n"), 0o644)
+	a.pollMiniCommands()
+	if !a.todos[2].Done {
+		t.Fatal("mini window could not tick a task off")
+	}
+	data, _ := os.ReadFile(statePath())
+	if !strings.Contains(string(data), `"tasks":[{"id":0,"text":"A","done":false},{"id":2,"text":"C","done":true}]`) {
+		t.Fatalf("tasks missing in mini state: %s", data)
+	}
+	a.endSession()
+	if a.todos[0].Pomos != 1 || a.todos[2].Pomos != 1 || a.todos[1].Pomos != 0 {
+		t.Fatal("pomodoros not credited to the session tasks")
+	}
+	if !a.todos[0].Current || a.todos[2].Current {
+		t.Fatal("open task should stay in the session, done one should leave")
+	}
+}

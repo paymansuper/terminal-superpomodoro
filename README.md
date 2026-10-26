@@ -97,12 +97,16 @@ Theme, font, bar and scene open a small picker. Move with `↑` `↓`, the timer
 
 ## To-do list
 
-Press `l` to open the list right inside the timer.
+Press `l` to open the list right inside the timer. The idea is simple.
+
+1. **Plan** a focus session by adding one or more tasks to it with `return`.
+2. **Work.** The session's tasks are listed under the timer and as a checklist in the mini window, where a click ticks one off.
+3. **Finish.** When the focus phase ends, every task of the session gets the pomodoro. Done tasks leave the session, open ones stay for the next one. The mini window shows the list again in the center of the screen, so you can tick off what you finished before the break.
 
 | Key | In the list |
 | --- | --- |
 | `a` | Add a task, type it and press `return` |
-| `return` | Focus on the selected task, it shows up under the timer and in the mini window |
+| `return` | Add the task to this focus session, or take it out again |
 | `x` | Mark done or open again |
 | `e` | Edit |
 | `d` | Delete |
@@ -110,12 +114,12 @@ Press `l` to open the list right inside the timer.
 | `c` | Clear all done tasks |
 | `l` `esc` | Close the list |
 
-Every finished focus phase counts for the task you are focusing on, so you see how many pomodoros it took. The list is a plain Markdown checklist in `~/.config/superpomodoro/todos.md`, edit it in any editor and the timer picks up the changes. From the command line it works too.
+The `×3` next to a task tells you how many pomodoros it took so far. The list is a plain Markdown checklist in `~/.config/superpomodoro/todos.md`, edit it in any editor and the timer picks up the changes. From the command line it works too.
 
 ```sh
 spomo todo add Write the investor update
 spomo todo                 # list with numbers
-spomo todo focus 1
+spomo todo focus 1         # add to this session (again to remove)
 spomo todo done 1
 spomo todo clear           # remove done tasks
 ```
