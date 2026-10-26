@@ -1,0 +1,29 @@
+{
+  "format": "superpomodoro-theme",
+  "version": 1,
+  "generator": "superpomodoro dev",
+  "exported": "2026-10-26T12:29:27Z",
+  "themes": [
+    {
+      "name": "nord",
+      "colors": {
+        "focus": [
+          "#bf616a",
+          "#d08770"
+        ],
+        "break": [
+          "#88c0d0",
+          "#a3be8c"
+        ],
+        "long": [
+          "#81a1c1",
+          "#b48ead"
+        ],
+        "text": "#eceff4",
+        "muted": "#4c566a",
+        "surface": "#3b4252"
+      },
+      "scene": "off"
+    }
+  ]
+}

@@ -2,7 +2,7 @@ package main
 
 // Theme files: ~/.config/superpomodoro/themes/<name>.theme
 //
-//   extends = "nord"                  # start from any built-in or custom theme
+//   extends = "dracula"               # start from any built-in or custom theme
 //   focus   = "#bf616a #d08770"       # gradient pair (one color is fine too)
 //   break   = "#88c0d0 #a3be8c"
 //   long    = "#81a1c1 #b48ead"

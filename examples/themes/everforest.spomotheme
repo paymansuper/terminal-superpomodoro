@@ -1,0 +1,29 @@
+{
+  "format": "superpomodoro-theme",
+  "version": 1,
+  "generator": "superpomodoro dev",
+  "exported": "2026-10-26T12:29:27Z",
+  "themes": [
+    {
+      "name": "everforest",
+      "colors": {
+        "focus": [
+          "#e67e80",
+          "#dbbc7f"
+        ],
+        "break": [
+          "#83c092",
+          "#a7c080"
+        ],
+        "long": [
+          "#d699b6",
+          "#7fbbb3"
+        ],
+        "text": "#d3c6aa",
+        "muted": "#7a8478",
+        "surface": "#343f44"
+      },
+      "scene": "off"
+    }
+  ]
+}

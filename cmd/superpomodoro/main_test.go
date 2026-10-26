@@ -79,7 +79,7 @@ func TestThemeFile(t *testing.T) {
 	os.MkdirAll(themeDir(), 0o755)
 	os.WriteFile(filepath.Join(themeDir(), "ocean.theme"), []byte(`
 # my theme
-extends = "nord"
+extends = "dracula"
 focus = "#112233, #445566"
 break = "#abcdef"   # single color
 scene = "waves"
@@ -93,7 +93,7 @@ image_brightness = 0.3
 	}
 	o, ok := findTheme(list, "ocean")
 	if !ok || o.FocusA != hex("#112233") || o.BreakB != hex("#abcdef") || o.Scene != "waves" ||
-		o.ImageBrightness != 0.3 || o.Muted != hex("#4c566a") {
+		o.ImageBrightness != 0.3 || o.Muted != hex("#6272a4") {
 		t.Fatalf("ocean parsed wrong: %+v", o)
 	}
 	m, _ := findTheme(list, "matrix")
@@ -219,7 +219,7 @@ func TestThemeExchangeFormat(t *testing.T) {
 	png.Encode(f, image.NewRGBA(image.Rect(0, 0, 4, 4)))
 	f.Close()
 	os.WriteFile(filepath.Join(themeDir(), "fjord.theme"), []byte(
-		"extends = \"nord\"\ndescription = \"calm\"\nauthor = \"P\"\nfocus = \"#010203 #040506\"\nscene = \"waves\"\nimage = \""+imgPath+"\"\nimage_brightness = 0.3\n"), 0o644)
+		"extends = \"dracula\"\ndescription = \"calm\"\nauthor = \"P\"\nfocus = \"#010203 #040506\"\nscene = \"waves\"\nimage = \""+imgPath+"\"\nimage_brightness = 0.3\n"), 0o644)
 	list, err := loadThemes()
 	if err != nil {
 		t.Fatal(err)
@@ -230,7 +230,7 @@ func TestThemeExchangeFormat(t *testing.T) {
 		t.Fatal(err)
 	}
 	data, _ := marshalPackage(pkg)
-	if !strings.Contains(string(data), `"format": "superpomodoro-theme"`) || pkg.Themes[0].Colors.Muted != "#4c566a" {
+	if !strings.Contains(string(data), `"format": "superpomodoro-theme"`) || pkg.Themes[0].Colors.Muted != "#6272a4" {
 		t.Fatalf("package wrong: %s", data[:200])
 	}
 
@@ -254,9 +254,9 @@ func TestThemeExchangeFormat(t *testing.T) {
 		t.Fatalf("clash not renamed: %+v", res)
 	}
 	// importing a built-in name is renamed too
-	nordPkg, _ := buildPackage([]themeJSON{toJSON(themes[themeIndex("nord")])})
+	nordPkg, _ := buildPackage([]themeJSON{toJSON(themes[themeIndex("dracula")])})
 	nd, _ := marshalPackage(nordPkg)
-	if res, _ := importThemes(nd, "", false); res.Imported[0] != "nord-2" {
+	if res, _ := importThemes(nd, "", false); res.Imported[0] != "dracula-2" {
 		t.Fatalf("builtin clash: %+v", res)
 	}
 	// plain .theme files work as well
@@ -372,5 +372,61 @@ func TestImageFitAndTransparency(t *testing.T) {
 	}
 	if _, _, _, a := out.At(100, 50).RGBA(); a == 0 {
 		t.Fatal("sharp image lost the logo")
+	}
+}
+
+func TestTodos(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	src := "# list\n- [ ] Write update <!-- pomodoros: 2, current -->\n- [x] Review NDA\n* [ ] Call Ingo\nnot a task\n"
+	list := parseTodos(src)
+	if len(list) != 3 || !list[0].Current || list[0].Pomos != 2 || !list[1].Done || list[2].Text != "Call Ingo" {
+		t.Fatalf("parse: %+v", list)
+	}
+	if again := parseTodos(formatTodos(list)); len(again) != 3 || again[0] != list[0] || again[1] != list[1] {
+		t.Fatalf("round trip: %+v", again)
+	}
+	cfg := defaultConfig()
+	cfg.Sound, cfg.Notify, cfg.RaiseOnEnd = false, false, false
+	a := &App{cfg: cfg, round: 1, todos: list}
+	a.setPhase(Focus)
+	r, w, _ := os.Pipe()
+	old := os.Stdout
+	os.Stdout = w
+	a.finish()
+	w.Close()
+	os.Stdout = old
+	io.ReadAll(r)
+	if loadTodos()[0].Pomos != 3 {
+		t.Fatal("focus phase not credited to the current task")
+	}
+	// keys: open list, add a task by typing, mark done
+	a.mode = modeNormal
+	for _, k := range parseKeys([]byte("l")) {
+		a.handleKey(k, func() {})
+	}
+	for _, k := range parseKeys([]byte("aNeue Aufgabe äö\r")) {
+		a.handleKey(k, func() {})
+	}
+	if last := a.todos[len(a.todos)-1]; last.Text != "Neue Aufgabe äö" || a.mode != modeTodo {
+		t.Fatalf("typing a task failed: %+v mode %v", last, a.mode)
+	}
+	a.handleKey(key{code: kUp}, func() {})
+	a.handleKey(key{code: kRune, r: 'x'}, func() {})
+	if !a.todos[len(a.todos)-2].Done {
+		t.Fatal("x did not toggle done")
+	}
+	// picker: arrow moves with live preview, esc restores
+	a.mode, a.theme = modeNormal, 0
+	a.handleKey(key{code: kRune, r: 't'}, func() {})
+	a.handleKey(key{code: kDown}, func() {})
+	if a.theme != 1 || a.mode != modePicker {
+		t.Fatal("picker did not preview")
+	}
+	a.handleKey(key{code: kEsc}, func() {})
+	if a.theme != 0 || a.mode != modeNormal {
+		t.Fatal("esc did not restore the theme")
+	}
+	if ks := parseKeys([]byte("\x1b[A\x1b[B\x1b")); len(ks) != 3 || ks[0].code != kUp || ks[1].code != kDown || ks[2].code != kEsc {
+		t.Fatalf("key parsing: %+v", ks)
 	}
 }

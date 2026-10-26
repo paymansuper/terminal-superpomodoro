@@ -56,6 +56,14 @@ type Config struct {
 }
 
 type App struct {
+	mode          uiMode
+	picker        *picker
+	todos         []todo
+	todoSel       int
+	todoStamp     string
+	todoCheck     time.Time
+	input         []rune
+	inputEdit     int
 	sharp         sharpLayer
 	floatPID      int
 	img           imageLayer
@@ -294,6 +302,7 @@ func (a *App) finish() {
 		Long:  "Long break over. New cycle.",
 	}[prev]
 	if prev == Focus {
+		a.creditPomodoro()
 		a.playSound(a.cfg.SoundFocus)
 	} else {
 		a.playSound(a.cfg.SoundBreak)
@@ -519,7 +528,17 @@ func (a *App) frame() string {
 	}
 
 	if !a.cfg.Zen {
-		lines = append(lines, header, line{})
+		lines = append(lines, header)
+		if task := a.currentTask(); task != nil {
+			txt := truncate(task.Text, max(w-20, 10))
+			pom := ""
+			if task.Pomos > 0 {
+				pom = fmt.Sprintf("  ×%d", task.Pomos)
+			}
+			lines = append(lines, line{t.Text.fg() + txt + reset + ca.fg() + pom + reset,
+				utf8.RuneCountInString(txt) + utf8.RuneCountInString(pom)})
+		}
+		lines = append(lines, line{})
 	}
 	clockFrom := len(lines)
 	if w < clockW*2+2 || h < 9 {
@@ -564,9 +583,14 @@ func (a *App) frame() string {
 			lines = append(lines, line{}, plain(t.Text, a.flash))
 		}
 		lines = append(lines, line{})
-		if a.cfg.Keys {
+		switch {
+		case a.mode == modeTodo || a.mode == modeInput:
+			lines = append(lines, a.todoCard(w)...)
+		case a.mode == modePicker:
+			lines = append(lines, a.pickerCard(w)...)
+		case a.cfg.Keys:
 			lines = append(lines, a.legend(w)...)
-		} else {
+		default:
 			lines = append(lines, line{t.Text.fg() + "k" + reset + t.Muted.fg() + "  show shortcuts" + reset, 17})
 		}
 	}
@@ -740,6 +764,7 @@ func usage() {
 Usage: superpomodoro [flags]
        superpomodoro themegen            open the theme editor in your browser
        superpomodoro theme list|new|dir  manage theme files
+       superpomodoro todo [add|done|rm]  manage the to-do list
 
 Flags:
 `, version)
@@ -767,6 +792,8 @@ func main() {
 			os.Exit(themeCommand(os.Args[2:]))
 		case "themegen":
 			os.Exit(themegenCommand(os.Args[2:]))
+		case "todo", "todos":
+			os.Exit(todoCommand(os.Args[2:]))
 		}
 	}
 	themeErr := error(nil)
@@ -800,7 +827,7 @@ func main() {
 	cfg.Rounds = max(*rounds, 1)
 	cfg.Auto, cfg.Bell, cfg.Notify, cfg.Zen, cfg.Sound = *auto, *bell, !*noNotify, *zen, !*noSound
 
-	a := &App{cfg: cfg, round: 1, theme: themeIndex(*theme), font: fontIndex(*font), bar: barIndex(*bar), bgEff: effectIndex(*bgFlag), sharp: sharpLayer{kind: detectSharp(cfg.ImageMode)}, imageFlag: *imageFlag, themeStamp: themeFilesStamp(), start: time.Now()}
+	a := &App{cfg: cfg, round: 1, theme: themeIndex(*theme), font: fontIndex(*font), bar: barIndex(*bar), bgEff: effectIndex(*bgFlag), todos: loadTodos(), todoStamp: todoStamp(), sharp: sharpLayer{kind: detectSharp(cfg.ImageMode)}, imageFlag: *imageFlag, themeStamp: themeFilesStamp(), start: time.Now()}
 	if themeErr != nil {
 		a.setFlash("theme file: " + themeErr.Error())
 	}
@@ -829,21 +856,17 @@ func main() {
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
-	keys := make(chan byte, 16)
+	keys := make(chan key, 64)
 	go func() {
-		buf := make([]byte, 16)
+		buf := make([]byte, 256)
 		for {
 			n, err := os.Stdin.Read(buf)
 			if err != nil {
 				close(keys)
 				return
 			}
-			// ignore escape sequences (arrows etc.), but allow a lone ESC
-			if n > 1 && buf[0] == 0x1b {
-				continue
-			}
-			for _, b := range buf[:n] {
-				keys <- b
+			for _, k := range parseKeys(buf[:n]) {
+				keys <- k
 			}
 		}
 	}()
@@ -857,6 +880,7 @@ func main() {
 			a.finish()
 		}
 		a.reloadThemesIfChanged()
+		a.reloadTodosIfChanged()
 		if a.mini {
 			a.pollMiniCommands()
 			if time.Since(a.lastMiniWrite) > 200*time.Millisecond {
@@ -872,63 +896,7 @@ func main() {
 			if !ok {
 				quit()
 			}
-			switch k {
-			case 'q', 'Q', 3, 0x1b:
-				quit()
-			case ' ', 'p':
-				a.toggle()
-			case 's', 'n':
-				a.advance(false)
-			case 'r':
-				a.setPhase(a.phase)
-				a.ready = false
-			case '+', '=':
-				a.adjust(time.Minute)
-			case '-', '_':
-				a.adjust(-time.Minute)
-			case 't':
-				a.theme = (a.theme + 1) % len(themes)
-				a.setFlash("theme · " + themes[a.theme].Name)
-			case 'T':
-				a.theme = (a.theme - 1 + len(themes)) % len(themes)
-				a.setFlash("theme · " + themes[a.theme].Name)
-			case 'f':
-				a.font = (a.font + 1) % len(fonts)
-				a.setFlash("font · " + fonts[a.font].Name)
-			case 'b':
-				a.bar = (a.bar + 1) % len(bars)
-				a.setFlash("bar · " + bars[a.bar].Name)
-			case 'w':
-				a.toggleMini()
-			case 'i':
-				a.imageOff = !a.imageOff
-				if p, _ := a.imageSetting(); p == "" && !a.imageOff {
-					a.setFlash("no background image set, see README")
-				} else if a.imageOff {
-					a.setFlash("background image off")
-				} else {
-					a.setFlash("background image on")
-				}
-			case 'g':
-				a.bgEff = (a.bgEff + 1) % len(effectNames)
-				name := effectNames[a.bgEff]
-				if name == "auto" {
-					name = "auto (" + themes[a.theme].Scene + ")"
-				}
-				a.setFlash("background · " + name)
-			case 'm':
-				a.cfg.Sound = !a.cfg.Sound
-				if a.cfg.Sound {
-					a.setFlash("sound on")
-					a.playSound(a.cfg.SoundFocus)
-				} else {
-					a.setFlash("sound off")
-				}
-			case 'z':
-				a.cfg.Zen = !a.cfg.Zen
-			case 'k', '?', 'h':
-				a.cfg.Keys = !a.cfg.Keys
-			}
+			a.handleKey(k, quit)
 		case <-tick.C:
 		}
 	}

@@ -22,7 +22,7 @@ The formal definition is the JSON Schema in [`theme-format.schema.json`](theme-f
       "name": "fjord",
       "description": "Calm blues for long deep work sessions",
       "author": "Payman",
-      "extends": "nord",
+      "extends": "tokyo-night",
       "colors": {
         "focus": ["#5e81ac", "#88c0d0"],
         "break": ["#a3be8c", "#ebcb8b"],

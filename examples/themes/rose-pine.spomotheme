@@ -1,0 +1,29 @@
+{
+  "format": "superpomodoro-theme",
+  "version": 1,
+  "generator": "superpomodoro dev",
+  "exported": "2026-10-26T12:29:27Z",
+  "themes": [
+    {
+      "name": "rose-pine",
+      "colors": {
+        "focus": [
+          "#eb6f92",
+          "#f6c177"
+        ],
+        "break": [
+          "#9ccfd8",
+          "#c4a7e7"
+        ],
+        "long": [
+          "#31748f",
+          "#c4a7e7"
+        ],
+        "text": "#e0def4",
+        "muted": "#6e6a86",
+        "surface": "#26233a"
+      },
+      "scene": "off"
+    }
+  ]
+}

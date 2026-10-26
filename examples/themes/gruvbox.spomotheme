@@ -1,0 +1,29 @@
+{
+  "format": "superpomodoro-theme",
+  "version": 1,
+  "generator": "superpomodoro dev",
+  "exported": "2026-10-26T12:29:27Z",
+  "themes": [
+    {
+      "name": "gruvbox",
+      "colors": {
+        "focus": [
+          "#fb4934",
+          "#fabd2f"
+        ],
+        "break": [
+          "#8ec07c",
+          "#83a598"
+        ],
+        "long": [
+          "#d3869b",
+          "#83a598"
+        ],
+        "text": "#ebdbb2",
+        "muted": "#7c6f64",
+        "surface": "#3c3836"
+      },
+      "scene": "off"
+    }
+  ]
+}

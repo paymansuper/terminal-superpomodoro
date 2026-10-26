@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.3.0
+
+- To-do list in the timer (`l`): add, edit, reorder, mark done and focus on a task, pomodoros are counted per task, stored as a Markdown checklist
+- `spomo todo` command to manage the list from the shell
+- Current task shows under the timer and in the mini window
+- Theme, font, bar and scene open a picker with live preview instead of cycling
+- Seven built-in themes (tokyo-night, catppuccin, dracula, kanagawa, synthwave, matrix, mono), Nord, Gruvbox, Rosé Pine and Everforest moved to `examples/themes` as importable `.spomotheme` files
+- `esc` no longer quits, it closes panels, quit with `q`
+
 ## v0.2.2
 
 - Background images can be shown whole (`image_fit = "contain"`) with size and position, logos and transparent pictures do that automatically

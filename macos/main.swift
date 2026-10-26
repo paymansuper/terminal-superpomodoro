@@ -34,6 +34,7 @@ struct TimerState: Decodable {
     var imageFit: String?      // "cover" or "contain", resolved by the terminal app
     var imageScale: Double?
     var imagePosition: String?
+    var task: String?          // current to-do, if one is set as focus
 }
 
 extension Color {
@@ -150,9 +151,11 @@ struct FloatView: View {
                 Text(s.phase)
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .foregroundColor(Color(hex: s.muted))
-                Text(statusText(s))
+                Text(s.task ?? statusText(s))
                     .font(.system(size: 10, weight: .regular, design: .rounded))
-                    .foregroundColor(Color(hex: s.muted).opacity(0.8))
+                    .foregroundColor(Color(hex: s.task == nil ? s.muted : s.text).opacity(0.85))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                 Spacer(minLength: 4)
                 if model.hovering { controls(s) }
             }

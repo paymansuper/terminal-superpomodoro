@@ -91,6 +91,7 @@ func (a *App) legend(screenW int) []line {
 		{"s", "skip phase", "", false},
 		{"r", "restart phase", "", false},
 		{"+ / -", "one minute", "", false},
+		{"l", "to-do list", "", false},
 	}
 	look := []entry{
 		{"t", "theme", themes[a.theme].Name, true},
@@ -158,11 +159,15 @@ func (a *App) legend(screenW int) []line {
 		s.cell(gap+"LOOK", len(gap)+c2Key+c2Label+c2Chip, t.Muted, true)
 		s.cell(gap+"VIEW", len(gap)+c3Key+c3Label+c3Chip+2, t.Muted, true)
 	}))
-	for i := 0; i < 5; i++ {
-		e1, e2, e3 := entry{}, look[i], view[i]
-		if i < len(timer) {
-			e1 = timer[i]
+	rows := max(len(timer), len(look), len(view))
+	at := func(list []entry, i int) entry {
+		if i < len(list) {
+			return list[i]
 		}
+		return entry{}
+	}
+	for i := 0; i < rows; i++ {
+		e1, e2, e3 := at(timer, i), at(look, i), at(view, i)
 		out = append(out, row(func(s *seg) {
 			s.cell("", 2, t.Text, false)
 			put(s, e1, c1Key, c1Label, 0)

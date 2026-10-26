@@ -37,6 +37,7 @@ type miniState struct {
 	ImageFit  string  `json:"imageFit,omitempty"`
 	ImageSc   float64 `json:"imageScale,omitempty"`
 	ImagePos  string  `json:"imagePosition,omitempty"`
+	Task      string  `json:"task,omitempty"`
 }
 
 func (c rgb) hexStr() string { return fmt.Sprintf("#%02x%02x%02x", c.r, c.g, c.b) }
@@ -67,6 +68,9 @@ func (a *App) writeMiniState() {
 		Running: a.running, Ready: a.ready, Event: a.event, Message: a.eventMsg,
 		ColorA: ca.hexStr(), ColorB: cb.hexStr(), Text: t.Text.hexStr(), Muted: t.Muted.hexStr(),
 		Surface: lerp(t.Surface, rgb{0, 0, 0}, 0.35).hexStr(), Auto: a.cfg.Auto,
+	}
+	if task := a.currentTask(); task != nil {
+		st.Task = task.Text
 	}
 	if o := a.imageOptions(); o.Path != "" {
 		st.Image, st.ImageBr, st.ImageSc, st.ImagePos = expandHome(o.Path), o.Bright, o.Scale, o.Pos

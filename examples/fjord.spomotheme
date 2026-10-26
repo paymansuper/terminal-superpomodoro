@@ -2,11 +2,11 @@
   "format": "superpomodoro-theme",
   "version": 1,
   "generator": "superpomodoro dev",
-  "exported": "2026-10-26T11:19:09Z",
+  "exported": "2026-10-26T12:31:48Z",
   "themes": [
     {
       "name": "fjord",
-      "extends": "nord",
+      "extends": "tokyo-night",
       "colors": {
         "focus": [
           "#5e81ac",

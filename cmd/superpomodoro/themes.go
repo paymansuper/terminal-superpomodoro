@@ -57,12 +57,8 @@ func mk(name, fa, fb, ba, bb, la, lb, text, muted, surface string) Theme {
 var builtinThemes = []Theme{
 	mk("tokyo-night", "#f7768e", "#bb9af7", "#7dcfff", "#9ece6a", "#7aa2f7", "#bb9af7", "#c0caf5", "#565f89", "#292e42"),
 	mk("catppuccin", "#f38ba8", "#fab387", "#94e2d5", "#89b4fa", "#cba6f7", "#89dceb", "#cdd6f4", "#6c7086", "#313244"),
-	mk("gruvbox", "#fb4934", "#fabd2f", "#8ec07c", "#83a598", "#d3869b", "#83a598", "#ebdbb2", "#7c6f64", "#3c3836"),
-	mk("nord", "#bf616a", "#d08770", "#88c0d0", "#a3be8c", "#81a1c1", "#b48ead", "#eceff4", "#4c566a", "#3b4252"),
 	mk("dracula", "#ff79c6", "#bd93f9", "#8be9fd", "#50fa7b", "#bd93f9", "#8be9fd", "#f8f8f2", "#6272a4", "#44475a"),
-	mk("rose-pine", "#eb6f92", "#f6c177", "#9ccfd8", "#c4a7e7", "#31748f", "#c4a7e7", "#e0def4", "#6e6a86", "#26233a"),
 	mk("kanagawa", "#e46876", "#ffa066", "#7fb4ca", "#98bb6c", "#957fb8", "#7aa89f", "#dcd7ba", "#727169", "#2a2a37"),
-	mk("everforest", "#e67e80", "#dbbc7f", "#83c092", "#a7c080", "#d699b6", "#7fbbb3", "#d3c6aa", "#7a8478", "#343f44"),
 	mk("synthwave", "#ff2a6d", "#ff9e00", "#05d9e8", "#d1f7ff", "#b967ff", "#05d9e8", "#f5f5ff", "#7a5c9e", "#2b213a"),
 	mk("matrix", "#00ff41", "#008f11", "#00ff9c", "#00b36b", "#39ff14", "#00ff9c", "#b6ffb6", "#1f6b2c", "#0b2410"),
 	mk("mono", "#ffffff", "#8a8a8a", "#d0d0d0", "#7a7a7a", "#e0e0e0", "#6a6a6a", "#e6e6e6", "#5c5c5c", "#2a2a2a"),

@@ -13,14 +13,15 @@
 
 </div>
 
-SuperPomodoro turns your terminal into a calm, good looking focus timer. Big gradient digits, eleven hand tuned color themes and a few carefully designed animated scenes. When you want your screen back, press `w` and the timer shrinks into a small window in the corner that stays on top of everything. When a phase ends, it comes back to the center of the screen so you can't miss it.
+SuperPomodoro turns your terminal into a calm, good looking focus timer. Big gradient digits, hand tuned color themes, a built in to-do list and a few carefully designed animated scenes. When you want your screen back, press `w` and the timer shrinks into a small window in the corner that stays on top of everything. When a phase ends, it comes back to the center of the screen so you can't miss it.
 
 It is a single Go binary with zero dependencies, plus a tiny native Swift helper for the macOS mini window.
 
 ## Features
 
 - **Big, readable clock** with gradient digits, six digit fonts and five progress bar styles
-- **Eleven themes**, from Tokyo Night and Catppuccin to Gruvbox, Nord and a monochrome option
+- **Seven built-in themes**, from Tokyo Night and Catppuccin to Matrix and a monochrome option, plus more to import
+- **To-do list** right in the timer, pick a task to focus on and see how many pomodoros it took
 - **Three animated scenes** that mean something, like a retro sun that sets as the phase runs out
 - **Theme editor in your browser** with color pickers, palette generator, image drag and drop and a live preview
 - **Share themes** as a single `.spomotheme` file with colors and image included, import in the terminal or the browser
@@ -78,10 +79,11 @@ Press `space` to start. Everything else is one key away.
 | `s` | Skip to the next phase |
 | `r` | Restart the current phase |
 | `+` `-` | Add or remove one minute |
-| `t` `T` | Next or previous theme |
-| `f` | Change the digit font |
-| `b` | Change the progress bar |
-| `g` | Cycle the background animation |
+| `t` | Pick a theme |
+| `f` | Pick a digit font |
+| `b` | Pick a progress bar |
+| `g` | Pick a background scene |
+| `l` | To-do list |
 | `i` | Background image on or off |
 | `z` | Zen mode, clock and bar only |
 | `m` | Sound on or off |
@@ -91,6 +93,33 @@ Press `space` to start. Everything else is one key away.
 
 The shortcut panel groups everything into timer, look and view, and shows the current value of every setting as a colored chip, so you always see what is active.
 
+Theme, font, bar and scene open a small picker. Move with `↑` `↓`, the timer previews every option live, `return` keeps it and `esc` goes back to what you had.
+
+## To-do list
+
+Press `l` to open the list right inside the timer.
+
+| Key | In the list |
+| --- | --- |
+| `a` | Add a task, type it and press `return` |
+| `return` | Focus on the selected task, it shows up under the timer and in the mini window |
+| `x` | Mark done or open again |
+| `e` | Edit |
+| `d` | Delete |
+| `J` `K` | Move the task down or up |
+| `c` | Clear all done tasks |
+| `l` `esc` | Close the list |
+
+Every finished focus phase counts for the task you are focusing on, so you see how many pomodoros it took. The list is a plain Markdown checklist in `~/.config/superpomodoro/todos.md`, edit it in any editor and the timer picks up the changes. From the command line it works too.
+
+```sh
+spomo todo add Write the investor update
+spomo todo                 # list with numbers
+spomo todo focus 1
+spomo todo done 1
+spomo todo clear           # remove done tasks
+```
+
 ## Themes
 
 | | |
@@ -98,7 +127,7 @@ The shortcut panel groups everything into timer, look and view, and shows the cu
 | <img src="docs/tokyo-night.svg" alt="Tokyo Night theme" width="420"><br>**tokyo-night** | <img src="docs/matrix.svg" alt="Matrix theme with code rain" width="420"><br>**matrix** |
 | <img src="docs/synthwave.svg" alt="Synthwave theme with retro sun" width="420"><br>**synthwave** | <img src="docs/kanagawa.svg" alt="Kanagawa theme with waves" width="420"><br>**kanagawa** |
 
-All themes: `tokyo-night`, `catppuccin`, `gruvbox`, `nord`, `dracula`, `rose-pine`, `kanagawa`, `everforest`, `synthwave`, `matrix`, `mono`.
+Built in: `tokyo-night`, `catppuccin`, `dracula`, `kanagawa`, `synthwave`, `matrix`, `mono`. More themes, like Nord, Gruvbox, Rosé Pine and Everforest, are in [`examples/themes`](examples/themes) and install with one command, for example `spomo theme import examples/themes/nord.spomotheme`.
 
 Each phase has its own color pair, so you can tell focus, short break and long break apart at a glance.
 
@@ -143,14 +172,14 @@ Saved themes appear in a running SuperPomodoro within a second, so you can keep 
 Prefer a text editor? Create your own theme in one command. It starts as a copy of any existing theme, so you only change what you care about.
 
 ```sh
-spomo theme new fjord --from nord       # writes ~/.config/superpomodoro/themes/fjord.theme
+spomo theme new fjord --from dracula    # writes ~/.config/superpomodoro/themes/fjord.theme
 spomo --theme fjord
 ```
 
 A theme file is plain text and every line is optional.
 
 ```ini
-extends = "nord"                    # start from any built-in or custom theme
+extends = "dracula"                 # start from any built-in or custom theme
 
 focus   = "#5e81ac #88c0d0"         # gradient for digits and bar during focus
 break   = "#a3be8c #ebcb8b"         # during a short break
@@ -282,6 +311,7 @@ image_fit = "auto"
 
 spomo themegen                         theme editor in the browser
 spomo theme list | new <name> [--from <theme>] | dir
+spomo todo [list | add <text> | done <n> | focus <n> | rm <n> | clear | path]
 spomo theme export <name>... | --all [-o file]
 spomo theme import <file> [--force]
 ```
